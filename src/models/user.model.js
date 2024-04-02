@@ -18,6 +18,7 @@ const userSchema = new Schema(
 			unique: true,
 			lowercase: true,
 			trim: true,
+			index: true,
 		},
 		name: {
 			type: String,
@@ -27,6 +28,9 @@ const userSchema = new Schema(
 		password: {
 			type: String,
 			required: [true, "Password is required"],
+		},
+		phone: {
+			type: String,
 		},
 		avatar: {
 			type: String,
@@ -39,6 +43,11 @@ const userSchema = new Schema(
 		},
 		location: {
 			type: String,
+		},
+		status: {
+			type: String,
+			enum: ["active", "inactive"],
+			default: "active",
 		},
 		rating: {
 			type: Number,

@@ -17,16 +17,37 @@ const productSchema = new Schema(
 			required: true,
 		},
 		condition: {
-			type: String, // new, good, fair
+			type: String,
+			enum: ["new", "good", "fair"],
 			required: true,
 		},
 		category: {
 			type: String,
 			required: true,
 		},
+		tags: [
+			{
+				type: String,
+				trim: true,
+			},
+		],
 		status: {
 			type: String, // available, traded
 			required: true,
+		},
+		desiredProduct: {
+			type: String,
+			trim: true,
+		},
+		likes: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "User",
+			},
+		],
+		views: {
+			type: Number,
+			default: 0,
 		},
 		location: {
 			type: String,
@@ -36,6 +57,12 @@ const productSchema = new Schema(
 			type: Boolean,
 			default: true,
 		},
+		interestedUsers: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "User",
+			},
+		],
 		owner: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
