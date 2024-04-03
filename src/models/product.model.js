@@ -53,7 +53,7 @@ const productSchema = new Schema(
 			type: String,
 			required: true,
 		},
-		isPublished: {
+		archive: {
 			type: Boolean,
 			default: true,
 		},

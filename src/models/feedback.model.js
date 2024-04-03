@@ -17,9 +17,9 @@ const feedbackSchema = new Schema(
 				message: "Please use integer for rating",
 			},
 		},
-		receiver: {
+		product: {
 			type: Schema.Types.ObjectId,
-			ref: "User",
+			ref: "Product",
 		},
 		author: {
 			type: Schema.Types.ObjectId,

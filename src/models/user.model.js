@@ -53,6 +53,12 @@ const userSchema = new Schema(
 			type: Number,
 			default: 0,
 		},
+		interestedProducts: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "Product",
+			},
+		],
 		refreshToken: {
 			type: String,
 		},

@@ -1,3 +1,4 @@
+## Models
 
 1. UserModel
     id (Primary Key)
@@ -10,6 +11,7 @@
     profilePictureUrl (Optional)
     bio (Optional)
     Access control fields like role or permissions could be added for more granular access control.
+
 2. ItemModel (for items users want to barter)
     id (Primary Key)
     ownerId (Foreign Key to UserModel)
@@ -21,6 +23,7 @@
     status (available, pending, traded)
     createdAt
     updatedAt
+
 3. TradeModel (to manage trade offers between users)
     id (Primary Key)
     itemOfferedId (Foreign Key to ItemModel)
@@ -30,6 +33,7 @@
     respondedByUserId (Foreign Key to UserModel, nullable)
     createdAt
     updatedAt
+
 4. MessageModel (if implementing a chat feature for negotiation)
     id (Primary Key)
     senderId (Foreign Key to UserModel)
@@ -37,6 +41,7 @@
     content
     status (sent, delivered, read)
     createdAt
+
 5. ReviewModel (to allow users to review each other post-trade)
     id (Primary Key)
     reviewerId (Foreign Key to UserModel)
@@ -46,20 +51,21 @@
     tradeId (Foreign Key to TradeModel, optional)
     createdAt
 
-
-Models
 userModel.js – Defines the UserModel schema and its methods.
 itemModel.js – Defines the ItemModel schema.
 tradeModel.js – Defines the TradeModel schema.
 messageModel.js – Defines the MessageModel schema for chat functionality.
 reviewModel.js – Defines the ReviewModel schema for user reviews.
 
-Controllers
-userController.js – Contains logic for user-related operations (e.g., registration, login).
-itemController.js – Contains logic for item management (e.g., add, update, delete items).
-tradeController.js – Contains logic for handling trade operations (e.g., initiate, accept, decline trades).
-messageController.js – Manages sending and receiving messages between users.
-reviewController.js – Handles creation and fetching of user reviews.
+## Controllers
+UserController
+ProductController
+WishlistController
+TransactionController
+MessageController
+NotificationController
+FeedbackController
+SearchController
 
 Middleware
 authMiddleware.js – Handles authentication and authorization.
