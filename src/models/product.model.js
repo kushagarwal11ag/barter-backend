@@ -13,8 +13,14 @@ const productSchema = new Schema(
 			trim: true,
 		},
 		image: {
-			type: String,
-			required: true,
+			id: {
+				type: String,
+				required: true,
+			},
+			url: {
+				type: String,
+				required: true,
+			},
 		},
 		condition: {
 			type: String,
@@ -25,6 +31,20 @@ const productSchema = new Schema(
 			type: String,
 			required: true,
 		},
+		desiredProduct: {
+			type: String,
+			trim: true,
+		},
+		location: {
+			type: String,
+			required: true,
+		},
+		owner: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
+		},
+		/*
 		tags: [
 			{
 				type: String,
@@ -34,10 +54,6 @@ const productSchema = new Schema(
 		status: {
 			type: String, // available, traded
 			required: true,
-		},
-		desiredProduct: {
-			type: String,
-			trim: true,
 		},
 		likes: [
 			{
@@ -49,13 +65,9 @@ const productSchema = new Schema(
 			type: Number,
 			default: 0,
 		},
-		location: {
-			type: String,
-			required: true,
-		},
-		archive: {
+		isEnabled: {
 			type: Boolean,
-			default: true,
+			default: false,
 		},
 		interestedUsers: [
 			{
@@ -63,14 +75,12 @@ const productSchema = new Schema(
 				ref: "User",
 			},
 		],
-		owner: {
-			type: Schema.Types.ObjectId,
-			ref: "User",
-		},
+		*/
 	},
 	{
 		timestamps: true,
 	}
 );
 
-export const Product = mongoose.model("Product", productSchema);
+const Product = mongoose.model("Product", productSchema);
+export default Product;

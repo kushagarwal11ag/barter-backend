@@ -1,3 +1,4 @@
+/*
 import mongoose, { Schema } from "mongoose";
 
 const messageSchema = new Schema(
@@ -26,3 +27,4 @@ const messageSchema = new Schema(
 );
 
 export const Message = mongoose.model("Message", messageSchema);
+*/

@@ -1,12 +1,13 @@
+/*
 import mongoose, { Schema } from "mongoose";
 
 const followerSchema = new Schema(
 	{
-		following: {
+		following: { // being followed to
 			type: Schema.Types.ObjectId,
 			ref: "User",
 		},
-		follower: {
+		follower: { // being followed by
 			type: Schema.Types.ObjectId,
 			ref: "User",
 		},
@@ -15,3 +16,4 @@ const followerSchema = new Schema(
 );
 
 export const Follower = mongoose.model("Follower", followerSchema);
+*/

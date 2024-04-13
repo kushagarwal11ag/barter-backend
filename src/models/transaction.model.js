@@ -12,9 +12,9 @@ const transactionSchema = new Schema(
 			ref: "Product",
 			required: true,
 		},
-		status: {
+		orderStatus: {
 			type: String,
-			enum: ["pending", "accepted", "declined", "cancelled", "completed"],
+			enum: ["pending", "completed", "cancelled"],
 			default: "pending",
 		},
 		terms: {
@@ -33,4 +33,5 @@ const transactionSchema = new Schema(
 	{ timestamps: true }
 );
 
-export const Transaction = mongoose.model("Transaction", transactionSchema);
+const Transaction = mongoose.model("Transaction", transactionSchema);
+export default Transaction;

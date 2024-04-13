@@ -4,14 +4,6 @@ import bcrypt from "bcrypt";
 
 const userSchema = new Schema(
 	{
-		username: {
-			type: String,
-			required: true,
-			unique: true,
-			lowercase: true,
-			trim: true,
-			index: true,
-		},
 		email: {
 			type: String,
 			required: true,
@@ -33,10 +25,12 @@ const userSchema = new Schema(
 			type: String,
 		},
 		avatar: {
-			type: String,
+			id: String,
+			url: String,
 		},
 		banner: {
-			type: String,
+			id: String,
+			url: String,
 		},
 		bio: {
 			type: String,
@@ -44,10 +38,13 @@ const userSchema = new Schema(
 		location: {
 			type: String,
 		},
-		status: {
+		refreshToken: {
 			type: String,
-			enum: ["active", "inactive"],
-			default: "active",
+		},
+		/*
+		status: {
+			type: Boolean,
+			default: true,
 		},
 		rating: {
 			type: Number,
@@ -59,9 +56,13 @@ const userSchema = new Schema(
 				ref: "Product",
 			},
 		],
-		refreshToken: {
-			type: String,
-		},
+		wishlist: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "Product",
+			},
+		],
+		*/
 	},
 	{
 		timestamps: true,
@@ -82,9 +83,6 @@ userSchema.methods.generateAccessToken = async function () {
 	return jwt.sign(
 		{
 			_id: this._id,
-			email: this.email,
-			username: this.username,
-			name: this.name,
 		},
 		process.env.ACCESS_TOKEN_SECRET,
 		{
@@ -105,4 +103,5 @@ userSchema.methods.generateRefreshToken = async function () {
 	);
 };
 
-export const User = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
+export default User;

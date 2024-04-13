@@ -1,3 +1,4 @@
+/*
 import mongoose, { Schema } from "mongoose";
 
 const notificationSchema = new Schema(
@@ -23,3 +24,4 @@ const notificationSchema = new Schema(
 );
 
 export const Notification = mongoose.model("Notification", notificationSchema);
+*/
