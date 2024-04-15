@@ -7,4 +7,4 @@ const healthCheck = asyncHandler(async (req, res) => {
 		.json(new ApiResponse(200, {}, "Server running as expected"));
 });
 
-export { healthCheck };
+export default healthCheck;

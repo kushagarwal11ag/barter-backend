@@ -14,10 +14,10 @@ const transactionSchema = new Schema(
 		},
 		orderStatus: {
 			type: String,
-			enum: ["pending", "completed", "cancelled"],
+			enum: ["pending", "accepted", "completed", "cancelled"],
 			default: "pending",
 		},
-		terms: {
+		remarks: {
 			type: String,
 		},
 		initiatedBy: {

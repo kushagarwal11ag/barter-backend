@@ -22,11 +22,15 @@ app.use(cookieParser());
 
 //routes import
 import userRouter from "./routes/user.routes.js";
-// import healthCheckRouter from "./routes/healthCheck.routes.js";
+import productRouter from "./routes/product.routes.js";
+import transactionRouter from "./routes/transaction.routes.js";
+import healthCheckRouter from "./routes/healthCheck.routes.js";
 
 //routes declaration
 app.use("/api/v1/users", userRouter);
-// app.use("/api/v1/health-check", healthCheckRouter);
+app.use("/api/v1/products", productRouter);
+app.use("/api/v1/transactions", transactionRouter);
+app.use("/api/v1/health-check", healthCheckRouter);
 
 app.use((err, req, res, next) => {
 	if (err instanceof ApiError) {

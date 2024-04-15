@@ -31,16 +31,16 @@ const productSchema = new Schema(
 			type: String,
 			required: true,
 		},
-		location: {
-			type: String,
-			required: true,
-		},
 		owner: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
 		/*
+		location: {
+			type: String,
+			required: true,
+		},
 		desiredProduct: {
 			type: String,
 			trim: true,
