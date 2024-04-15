@@ -149,16 +149,14 @@ const getUserById = asyncHandler(async (req, res) => {
 					$first: "$product",
 				},
 				avatar: "$avatar.url",
-				banner: "$banner.url",
 			},
 		},
 		{
 			$project: {
+				email: 1,
 				name: 1,
 				bio: 1,
-				phone: 1,
 				avatar: 1,
-				banner: 1,
 				location: 1,
 			},
 		},
@@ -171,6 +169,72 @@ const getUserById = asyncHandler(async (req, res) => {
 	return res
 		.status(200)
 		.json(new ApiResponse(200, user, "User retrieved successfully"));
+});
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+	const { name, bio, location } = req.body;
+	if (!name.trim() || !bio.trim() || !location.trim()) {
+		throw new ApiError(400, "No field requested for update");
+	}
+
+	const updatedUser = await User.findByIdAndUpdate(
+		req.user?._id,
+		{
+			$set: {
+				name,
+				bio,
+				location,
+			},
+		},
+		{
+			new: true,
+		}
+	).select("-password -refreshToken");
+
+	return res
+		.status(200)
+		.json(
+			new ApiResponse(
+				200,
+				updatedUser,
+				"Account details updated successfully"
+			)
+		);
+});
+
+const updateUserFiles = asyncHandler(async (req, res) => {
+	const avatarLocalPath = req.file?.path;
+	if (!avatarLocalPath) {
+		throw new ApiError(400, "Avatar file is missing");
+	}
+
+	const avatar = await uploadOnCloudinary(avatarLocalPath);
+	if (!avatar?.url) {
+		throw new ApiError(400, "Failed to upload avatar");
+	}
+
+	const updatedUser = await User.findByIdAndUpdate(
+		req.user?._id,
+		{
+			$set: {
+				avatar: {
+					id: avatar?.public_id,
+					url: avatar?.url,
+				},
+			},
+		},
+		{ new: true }
+	).select("-password -refreshToken");
+
+	if (avatarLocalPath && req.user?.avatar?.id) {
+		await deleteFromCloudinary(req.user?.avatar?.id);
+	}
+
+	return res
+		.status(200)
+		.json(
+			new ApiResponse(200, updatedUser, "User files updated successfully")
+		);
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
@@ -236,6 +300,8 @@ export {
 	loginUser,
 	getCurrentUser,
 	getUserById,
+	updateUserDetails,
+	updateUserFiles,
 	logoutUser,
 	refreshAccessToken,
 };
@@ -245,9 +311,8 @@ register user ✔️
 login user ✔️
 get current user ✔️
 get user (id) -> products ✔️ (follower count, feedback, notifications)
-update user (id)
-update avatar or banner
-delete avatar or banner
+update user (id) ✔️
+update avatar ✔️ (banner)
 logout user ✔️
 refresh access token ✔️
 

@@ -31,10 +31,6 @@ const productSchema = new Schema(
 			type: String,
 			required: true,
 		},
-		desiredProduct: {
-			type: String,
-			trim: true,
-		},
 		location: {
 			type: String,
 			required: true,
@@ -45,6 +41,10 @@ const productSchema = new Schema(
 			required: true,
 		},
 		/*
+		desiredProduct: {
+			type: String,
+			trim: true,
+		},
 		tags: [
 			{
 				type: String,

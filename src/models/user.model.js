@@ -21,14 +21,7 @@ const userSchema = new Schema(
 			type: String,
 			required: [true, "Password is required"],
 		},
-		phone: {
-			type: String,
-		},
 		avatar: {
-			id: String,
-			url: String,
-		},
-		banner: {
 			id: String,
 			url: String,
 		},
@@ -42,6 +35,13 @@ const userSchema = new Schema(
 			type: String,
 		},
 		/*
+		phone: {
+			type: String,
+		},
+		banner: {
+			id: String,
+			url: String,
+		},
 		status: {
 			type: Boolean,
 			default: true,
