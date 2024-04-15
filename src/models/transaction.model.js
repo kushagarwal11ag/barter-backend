@@ -25,9 +25,10 @@ const transactionSchema = new Schema(
 			ref: "User",
 			required: true,
 		},
-		agreedBy: {
+		recipient: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
+			required: true,
 		},
 	},
 	{ timestamps: true }

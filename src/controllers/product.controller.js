@@ -33,6 +33,9 @@ const getAllProducts = asyncHandler(async (req, res) => {
 		},
 		{
 			$addFields: {
+				user: {
+					$first: "$user",
+				},
 				image: "$image.url",
 			},
 		},
@@ -48,6 +51,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
 				image: 1,
 				condition: 1,
 				category: 1,
+				user: 1,
 				createdAt: 1,
 			},
 		},
