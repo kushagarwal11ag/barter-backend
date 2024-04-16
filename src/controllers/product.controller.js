@@ -103,7 +103,7 @@ const getUserProducts = asyncHandler(async (req, res) => {
 			new ApiResponse(
 				200,
 				products,
-				"All products retrieved successfully"
+				"All user products retrieved successfully"
 			)
 		);
 });
@@ -224,7 +224,6 @@ const updateProduct = asyncHandler(async (req, res) => {
 	const { productId } = req.params;
 
 	let image;
-
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
@@ -239,6 +238,13 @@ const updateProduct = asyncHandler(async (req, res) => {
 		)
 	) {
 		throw new ApiError(400, "No field requested for update");
+	}
+
+	if (
+		condition &&
+		!(condition === "new" || condition === "fair" || condition === "good")
+	) {
+		throw new ApiError(400, "Condition does not meet the requirements");
 	}
 
 	const product = await Product.findById(productId);
@@ -260,7 +266,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 		}
 
 		if (product.image.id) {
-			await deleteFromCloudinary(crop.image?.id);
+			await deleteFromCloudinary(product.image?.id);
 		}
 	}
 
@@ -298,7 +304,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 	if (!product) {
 		throw new ApiError(404, "Product not found");
 	}
-	if (product.owner.toString() !== req.user?.toString()) {
+	if (product.owner.toString() !== req.user?._id.toString()) {
 		throw new ApiError(403, "Access forbidden.");
 	}
 

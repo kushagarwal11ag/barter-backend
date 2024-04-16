@@ -6,11 +6,13 @@ const transactionSchema = new Schema(
 			type: Schema.Types.ObjectId,
 			ref: "Product",
 			required: true,
+			index: true,
 		},
 		productRequested: {
 			type: Schema.Types.ObjectId,
 			ref: "Product",
 			required: true,
+			index: true,
 		},
 		orderStatus: {
 			type: String,

@@ -26,11 +26,17 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
+							_id: 0,
 							title: 1,
 							image: 1,
 						},
 					},
 				],
+			},
+		},
+		{
+			$sort: {
+				createdAt: -1,
 			},
 		},
 		{
@@ -41,8 +47,10 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			product: 1,
-			orderStatus: 1,
+			$project: {
+				product: 1,
+				orderStatus: 1,
+			},
 		},
 	]);
 
@@ -78,11 +86,17 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
+							_id: 0,
 							title: 1,
 							image: 1,
 						},
 					},
 				],
+			},
+		},
+		{
+			$sort: {
+				createdAt: -1,
 			},
 		},
 		{
@@ -93,8 +107,10 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			product: 1,
-			orderStatus: 1,
+			$project: {
+				product: 1,
+				orderStatus: 1,
+			},
 		},
 	]);
 
@@ -109,142 +125,25 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 		);
 });
 
-const getUserAsInitiatorTransactionDetails = asyncHandler(async (req, res) => {
+const getTransactionDetails = asyncHandler(async (req, res) => {
 	const { transactionId } = req.params;
 
 	if (!transactionId || !isValidObjectId(transactionId)) {
 		throw new ApiError(400, "Invalid or missing transaction ID");
 	}
 
-	const transaction = await Transaction.aggregate([
-		{
-			$match: {
-				_id: new mongoose.Types.ObjectId(transactionId),
-				initiatedBy: new mongoose.Types.ObjectId(req.user?._id),
-			},
-		},
-		{
-			$lookup: {
-				from: "products",
-				localField: "productOffered",
-				foreignField: "_id",
-				as: "productOffer",
-				pipeline: [
-					{
-						$addFields: {
-							image: "$image.url",
-						},
-					},
-					{
-						$project: {
-							title: 1,
-							description: 1,
-							image: 1,
-							condition: 1,
-							category: 1,
-							createdAt: 1,
-						},
-					},
-				],
-			},
-		},
-		{
-			$lookup: {
-				from: "products",
-				localField: "productRequested",
-				foreignField: "_id",
-				as: "productRequest",
-				pipeline: [
-					{
-						$addFields: {
-							image: "$image.url",
-						},
-					},
-					{
-						$project: {
-							title: 1,
-							description: 1,
-							image: 1,
-							condition: 1,
-							category: 1,
-							createdAt: 1,
-						},
-					},
-				],
-			},
-		},
-		{
-			$lookup: {
-				from: "users",
-				localField: "recipient",
-				foreignField: "_id",
-				as: "user",
-				pipeline: [
-					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
-						$project: {
-							avatar: 1,
-							name: 1,
-						},
-					},
-				],
-			},
-		},
-		{
-			$addFields: {
-				productOffer: {
-					$first: "$productOffer",
-				},
-				productRequest: {
-					$first: "$productRequest",
-				},
-				user: {
-					$first: "$user",
-				},
-			},
-		},
-		{
-			$project: {
-				productOffer: 1,
-				productRequest: 1,
-				orderStatus: 1,
-				remarks: 1,
-				user: 1,
-			},
-		},
-	]);
-
-	if (!transaction.length) {
+	const transaction = await Transaction.findById(transactionId);
+	if (!transaction) {
 		throw new ApiError(404, "Transaction not found");
 	}
 
-	return res
-		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				transaction,
-				"Transaction retrieved successfully"
-			)
-		);
-});
+	const isInitiator =
+		transaction.initiatedBy?.toString() === req.user?._id?.toString();
 
-const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
-	const { transactionId } = req.params;
-
-	if (!transactionId || !isValidObjectId(transactionId)) {
-		throw new ApiError(400, "Invalid or missing transaction ID");
-	}
-
-	const transaction = await Transaction.aggregate([
+	const getTransaction = await Transaction.aggregate([
 		{
 			$match: {
 				_id: new mongoose.Types.ObjectId(transactionId),
-				recipient: new mongoose.Types.ObjectId(req.user?._id),
 			},
 		},
 		{
@@ -302,7 +201,28 @@ const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "initiatedBy",
 				foreignField: "_id",
-				as: "user",
+				as: "initiatedUser",
+				pipeline: [
+					{
+						$addFields: {
+							avatar: "$avatar.url",
+						},
+					},
+					{
+						$project: {
+							avatar: 1,
+							name: 1,
+						},
+					},
+				],
+			},
+		},
+		{
+			$lookup: {
+				from: "users",
+				localField: "recipient",
+				foreignField: "_id",
+				as: "recipientUser",
 				pipeline: [
 					{
 						$addFields: {
@@ -326,8 +246,11 @@ const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
 				productRequest: {
 					$first: "$productRequest",
 				},
-				user: {
-					$first: "$user",
+				initiatedUser: {
+					$first: "$initiatedUser",
+				},
+				recipientUser: {
+					$first: "$recipientUser",
 				},
 			},
 		},
@@ -337,13 +260,14 @@ const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
 				productRequest: 1,
 				orderStatus: 1,
 				remarks: 1,
-				user: 1,
+				initiatedUser: 1,
+				recipientUser: 1,
 			},
 		},
 	]);
 
-	if (!transaction.length) {
-		throw new ApiError(404, "Transaction not found");
+	if (getTransaction.length > 0) {
+		getTransaction[0].isInitiator = isInitiator;
 	}
 
 	return res
@@ -351,7 +275,7 @@ const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				transaction,
+				getTransaction,
 				"Transaction retrieved successfully"
 			)
 		);
@@ -385,6 +309,29 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 
 	if (productOffered.owner.toString() !== req.user?._id.toString()) {
 		throw new ApiError(403, "Access Forbidden.");
+	}
+	if (productRequested.owner.toString() === req.user?._id.toString()) {
+		throw new ApiError(403, "Access Forbidden.");
+	}
+
+	const existingTransaction = await Transaction.findOne({
+		$or: [
+			{
+				productOffered: productOfferedId,
+				productRequested: productRequestedId,
+			},
+			{
+				productOffered: productRequestedId,
+				productRequested: productOfferedId,
+			},
+		],
+	});
+
+	if (existingTransaction) {
+		throw new ApiError(
+			409,
+			"A transaction with these products already exists."
+		);
 	}
 
 	const transaction = await Transaction.create({
@@ -423,6 +370,10 @@ const updateTransaction = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Transaction not found");
 	}
 
+	if (transaction.recipient?.toString() !== req.user?._id.toString()) {
+		throw new ApiError(403, "Access Forbidden.");
+	}
+
 	await Transaction.findByIdAndUpdate(transactionId, {
 		$set: {
 			orderStatus,
@@ -437,8 +388,7 @@ const updateTransaction = asyncHandler(async (req, res) => {
 export {
 	getAllUserAsInitiatorTransactions,
 	getAllUserAsRecipientTransactions,
-	getUserAsInitiatorTransactionDetails,
-	getUserAsRecipientTransactionDetails,
+	getTransactionDetails,
 	initiateTransaction,
 	updateTransaction,
 };

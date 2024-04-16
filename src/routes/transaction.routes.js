@@ -2,8 +2,7 @@ import { Router } from "express";
 import {
 	getAllUserAsInitiatorTransactions,
 	getAllUserAsRecipientTransactions,
-	getUserAsInitiatorTransactionDetails,
-	getUserAsRecipientTransactionDetails,
+	getTransactionDetails,
 	initiateTransaction,
 	updateTransaction,
 } from "../controllers/transaction.controller.js";
@@ -19,11 +18,8 @@ router
 	.route("/user/recipient")
 	.get(verifyJWT, getAllUserAsRecipientTransactions);
 router
-	.route("/user/initiator/:transactionId")
-	.get(verifyJWT, getUserAsInitiatorTransactionDetails);
-router
-	.route("/user/recipient/:transactionId")
-	.get(verifyJWT, getUserAsRecipientTransactionDetails);
+	.route("/:transactionId")
+	.get(verifyJWT, getTransactionDetails);
 router
 	.route("/transaction/add/:productRequestedId")
 	.post(verifyJWT, initiateTransaction);
