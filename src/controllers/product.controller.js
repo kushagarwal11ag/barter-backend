@@ -68,7 +68,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
 		);
 });
 
-const getUserProducts = asyncHandler(async (res, res) => {
+const getUserProducts = asyncHandler(async (req, res) => {
 	const products = await Product.aggregate([
 		{
 			$match: {
@@ -108,7 +108,7 @@ const getUserProducts = asyncHandler(async (res, res) => {
 		);
 });
 
-const getProductById = asyncHandler(async (res, res) => {
+const getProductById = asyncHandler(async (req, res) => {
 	const { productId } = req.params;
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
@@ -323,8 +323,9 @@ export {
 };
 
 /*
-get particular product (id) ✔️
 get all products ✔️
+get all user products ✔️
+get particular product (id) ✔️
 create product ✔️
 update product [id] ✔️
 delete product [id] ✔️

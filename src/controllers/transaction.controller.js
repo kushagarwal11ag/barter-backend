@@ -5,7 +5,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-const getAllTransactionsInitiatedByUser = asyncHandler(async (req, res) => {
+const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
@@ -57,7 +57,7 @@ const getAllTransactionsInitiatedByUser = asyncHandler(async (req, res) => {
 		);
 });
 
-const getAllTransactionsInitiatedForUser = asyncHandler(async (req, res) => {
+const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
@@ -109,7 +109,7 @@ const getAllTransactionsInitiatedForUser = asyncHandler(async (req, res) => {
 		);
 });
 
-const getTransactionDetailsInitiatedByUser = asyncHandler(async (req, res) => {
+const getUserAsInitiatorTransactionDetails = asyncHandler(async (req, res) => {
 	const { transactionId } = req.params;
 
 	if (!transactionId || !isValidObjectId(transactionId)) {
@@ -233,7 +233,7 @@ const getTransactionDetailsInitiatedByUser = asyncHandler(async (req, res) => {
 		);
 });
 
-const getTransactionDetailsInitiatedForUser = asyncHandler(async (req, res) => {
+const getUserAsRecipientTransactionDetails = asyncHandler(async (req, res) => {
 	const { transactionId } = req.params;
 
 	if (!transactionId || !isValidObjectId(transactionId)) {
@@ -406,7 +406,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 });
 
-const updateTransaction = asyncHandler(async (res, res) => {
+const updateTransaction = asyncHandler(async (req, res) => {
 	const { orderStatus } = req.body;
 	const { transactionId } = req.params;
 
@@ -435,10 +435,10 @@ const updateTransaction = asyncHandler(async (res, res) => {
 });
 
 export {
-	getAllTransactionsInitiatedByUser,
-	getAllTransactionsInitiatedForUser,
-	getTransactionDetailsInitiatedByUser,
-	getTransactionDetailsInitiatedForUser,
+	getAllUserAsInitiatorTransactions,
+	getAllUserAsRecipientTransactions,
+	getUserAsInitiatorTransactionDetails,
+	getUserAsRecipientTransactionDetails,
 	initiateTransaction,
 	updateTransaction,
 };

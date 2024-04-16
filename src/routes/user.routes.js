@@ -3,7 +3,9 @@ import {
 	registerUser,
 	loginUser,
 	getCurrentUser,
-    getUserById,
+	getUserById,
+	updateUserDetails,
+	updateUserFiles,
 	logoutUser,
 	refreshAccessToken,
 } from "../controllers/user.controller.js";
@@ -19,6 +21,10 @@ router.route("/refresh-token").post(refreshAccessToken);
 // secured routes
 router.route("/user").get(verifyJWT, getCurrentUser);
 router.route("/user/:userId").get(verifyJWT, getUserById);
+router.route("/user/update").patch(verifyJWT, updateUserDetails);
+router
+	.route("/user/user-files")
+	.patch(verifyJWT, upload.single("avatar"), updateUserFiles);
 router.route("/logout").post(verifyJWT, logoutUser);
 
 export default router;

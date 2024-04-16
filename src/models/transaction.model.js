@@ -24,11 +24,13 @@ const transactionSchema = new Schema(
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
+			index: true,
 		},
 		recipient: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
+			index: true,
 		},
 	},
 	{ timestamps: true }

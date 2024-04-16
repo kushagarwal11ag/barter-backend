@@ -19,8 +19,8 @@ const options = {
 const generateAccessAndRefreshTokens = async (userId) => {
 	try {
 		const user = await User.findById(userId);
-		const accessToken = user.generateAccessToken();
-		const refreshToken = user.generateRefreshToken();
+		const accessToken = await user.generateAccessToken();
+		const refreshToken = await user.generateRefreshToken();
 
 		user.refreshToken = refreshToken;
 		await user.save({ validateBeforeSave: false });
@@ -140,6 +140,13 @@ const getUserById = asyncHandler(async (req, res) => {
 							image: "$image.url",
 						},
 					},
+					{
+						$project: {
+							title: 1,
+							image: 1,
+							category: 1,
+						},
+					},
 				],
 			},
 		},
@@ -158,6 +165,7 @@ const getUserById = asyncHandler(async (req, res) => {
 				bio: 1,
 				avatar: 1,
 				location: 1,
+				product: 1,
 			},
 		},
 	]);
@@ -173,7 +181,7 @@ const getUserById = asyncHandler(async (req, res) => {
 
 const updateUserDetails = asyncHandler(async (req, res) => {
 	const { name, bio, location } = req.body;
-	if (!name.trim() || !bio.trim() || !location.trim()) {
+	if (!(name?.trim() || bio?.trim() || location?.trim())) {
 		throw new ApiError(400, "No field requested for update");
 	}
 
@@ -266,7 +274,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 	}
 
 	try {
-		const decodedToken = jwt.verify(
+		const decodedToken = await jwt.verify(
 			incomingRefreshToken,
 			process.env.REFRESH_TOKEN_SECRET
 		);
