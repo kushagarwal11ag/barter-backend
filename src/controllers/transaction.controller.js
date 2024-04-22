@@ -370,10 +370,6 @@ const updateTransaction = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Transaction not found");
 	}
 
-	if (transaction.recipient?.toString() !== req.user?._id.toString()) {
-		throw new ApiError(403, "Access Forbidden.");
-	}
-
 	await Transaction.findByIdAndUpdate(transactionId, {
 		$set: {
 			orderStatus,

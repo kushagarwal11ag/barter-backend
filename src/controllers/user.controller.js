@@ -31,6 +31,17 @@ const generateAccessAndRefreshTokens = async (userId) => {
 	}
 };
 
+const handleFileUpload = async (filePath, fileType) => {
+	if (!filePath) return null;
+
+	const uploadedFile = await uploadOnCloudinary(filePath);
+	if (!uploadedFile?.url) {
+		throw new ApiError(500, `Failed to upload ${fileType}`);
+	}
+
+	return { id: uploadedFile?.public_id, url: uploadedFile?.url };
+};
+
 const registerUser = asyncHandler(async (req, res) => {
 	const { name, email, password } = req.body;
 
@@ -103,6 +114,40 @@ const loginUser = asyncHandler(async (req, res) => {
 		);
 });
 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+	const { oldPassword, newPassword } = req.body;
+	if (!oldPassword || !newPassword) {
+		throw new ApiError(400, "Both old and new passwords are required");
+	}
+
+	const { error: oldPasswordError } = validateUser({ password: oldPassword });
+	const { error: newPasswordError } = validateUser({ password: newPassword });
+
+	if (oldPasswordError || newPasswordError) {
+		let errorMessage = oldPasswordError
+			? oldPasswordError.details[0].message
+			: newPasswordError.details[0].message;
+		throw new ApiError(400, `Validation error: ${errorMessage}`);
+	}
+
+	if (oldPassword === newPassword) {
+		throw new ApiError(400, "New password cannot be same as the old one");
+	}
+
+	const user = req.user?._id;
+	const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+	if (!isPasswordValid) {
+		throw new ApiError(400, "The old password is incorrect");
+	}
+
+	user.password = newPassword;
+	await user.save({ validateBeforeSave: false });
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
 const getCurrentUser = asyncHandler(async (req, res) => {
 	return res
 		.status(200)
@@ -152,10 +197,8 @@ const getUserById = asyncHandler(async (req, res) => {
 		},
 		{
 			$addFields: {
-				product: {
-					$first: "$product",
-				},
 				avatar: "$avatar.url",
+				banner: "$banner.url",
 			},
 		},
 		{
@@ -163,13 +206,16 @@ const getUserById = asyncHandler(async (req, res) => {
 				name: 1,
 				bio: 1,
 				avatar: 1,
+				banner: 1,
+				phone: 1,
 				location: 1,
+				rating: 1,
 				product: 1,
 			},
 		},
 	]);
 
-	if (user.length === 0) {
+	if (!user.length) {
 		throw new ApiError(404, "User not found");
 	}
 
@@ -179,69 +225,66 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
-	const { name, bio, location } = req.body;
-	if (!(name?.trim() || bio?.trim() || location?.trim())) {
+	const { name, bio, phone, location } = req.body;
+	if (!(name?.trim() || bio?.trim() || phone?.trim() || location?.trim())) {
 		throw new ApiError(400, "No field requested for update");
 	}
 
-	const updatedUser = await User.findByIdAndUpdate(
-		req.user?._id,
-		{
-			$set: {
-				name,
-				bio,
-				location,
-			},
+	await User.findByIdAndUpdate(req.user?._id, {
+		$set: {
+			name,
+			bio,
+			phone,
+			location,
 		},
-		{
-			new: true,
-		}
-	).select("-password -refreshToken");
+	});
 
 	return res
 		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				updatedUser,
-				"Account details updated successfully"
-			)
-		);
+		.json(new ApiResponse(200, {}, "Account details updated successfully"));
 });
 
 const updateUserFiles = asyncHandler(async (req, res) => {
-	const avatarLocalPath = req.file?.path;
-	if (!avatarLocalPath) {
-		throw new ApiError(400, "Avatar file is missing");
+	const avatarLocalPath = req.files?.avatar?.[0]?.path;
+	const bannerLocalPath = req.files?.banner?.[0]?.path;
+	if (!(avatarLocalPath || bannerLocalPath)) {
+		throw new ApiError(400, "Upload files to proceed");
 	}
 
-	const avatar = await uploadOnCloudinary(avatarLocalPath);
-	if (!avatar?.url) {
-		throw new ApiError(400, "Failed to upload avatar");
+	const user = req.user;
+	const uploadObject = {};
+
+	if (avatarLocalPath) {
+		const avatar = await handleFileUpload(avatarLocalPath, "avatar");
+		uploadObject.avatar = {
+			id: avatar.id,
+			url: avatar.url,
+		};
+	}
+	if (bannerLocalPath) {
+		const banner = await handleFileUpload(bannerLocalPath, "govId");
+		uploadObject.banner = {
+			id: banner.id,
+			url: banner.url,
+		};
 	}
 
-	const updatedUser = await User.findByIdAndUpdate(
-		req.user?._id,
-		{
-			$set: {
-				avatar: {
-					id: avatar?.public_id,
-					url: avatar?.url,
-				},
-			},
+	await User.findByIdAndUpdate(user?._id, {
+		$set: {
+			...uploadObject,
 		},
-		{ new: true }
-	).select("-password -refreshToken");
+	});
 
-	if (avatarLocalPath && req.user?.avatar?.id) {
-		await deleteFromCloudinary(req.user?.avatar?.id);
+	if (avatarLocalPath && user?.avatar?.id) {
+		await deleteFromCloudinary(user?.avatar?.id);
+	}
+	if (bannerLocalPath && user?.banner?.id) {
+		await deleteFromCloudinary(user?.banner?.id);
 	}
 
 	return res
 		.status(200)
-		.json(
-			new ApiResponse(200, updatedUser, "User files updated successfully")
-		);
+		.json(new ApiResponse(200, {}, "User files updated successfully"));
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
@@ -305,6 +348,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 export {
 	registerUser,
 	loginUser,
+	changeCurrentPassword,
 	getCurrentUser,
 	getUserById,
 	updateUserDetails,
@@ -316,15 +360,14 @@ export {
 /*
 register user ✔️
 login user ✔️
+change password ✔️
 get current user ✔️
-get user (id) -> products ✔️ (follower count, feedback, notifications)
-update user (id) ✔️
-update avatar ✔️ (banner)
+get user -> products ✔️ (follower count, feedback)
+update user details ✔️
+update files (avatar, banner) ✔️
 logout user ✔️
 refresh access token ✔️
 
-// change password
-// update status
-// update rating
+// retrieve notifications
 // follow / un-follow user (id)
 */

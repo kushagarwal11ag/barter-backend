@@ -25,26 +25,18 @@ const userSchema = new Schema(
 			id: String,
 			url: String,
 		},
-		bio: {
-			type: String,
-		},
-		location: {
-			type: String,
-		},
-		refreshToken: {
-			type: String,
-		},
-		/*
-		phone: {
-			type: String,
-		},
 		banner: {
 			id: String,
 			url: String,
 		},
-		status: {
-			type: Boolean,
-			default: true,
+		bio: {
+			type: String,
+		},
+		phone: {
+			type: String,
+		},
+		location: {
+			type: String,
 		},
 		rating: {
 			type: Number,
@@ -62,7 +54,9 @@ const userSchema = new Schema(
 				ref: "Product",
 			},
 		],
-		*/
+		refreshToken: {
+			type: String,
+		},
 	},
 	{
 		timestamps: true,

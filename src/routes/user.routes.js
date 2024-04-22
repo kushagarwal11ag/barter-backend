@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
 	registerUser,
 	loginUser,
+	changeCurrentPassword,
 	getCurrentUser,
 	getUserById,
 	updateUserDetails,
@@ -16,15 +17,23 @@ const router = Router();
 
 router.route("/register").post(registerUser);
 router.route("/login").post(loginUser);
-router.route("/refresh-token").post(refreshAccessToken);
+router.route("/refresh").post(refreshAccessToken);
 
 // secured routes
-router.route("/user").get(verifyJWT, getCurrentUser);
-router.route("/user/:userId").get(verifyJWT, getUserById);
-router.route("/user/update").patch(verifyJWT, updateUserDetails);
+router.route("/me/password").patch(verifyJWT, changeCurrentPassword);
 router
-	.route("/user/user-files")
-	.patch(verifyJWT, upload.single("avatar"), updateUserFiles);
+	.route("/me")
+	.get(verifyJWT, getCurrentUser)
+	.put(verifyJWT, updateUserDetails)
+	.patch(
+		verifyJWT,
+		upload.fields([
+			{ name: "avatar", maxCount: 1 },
+			{ name: "banner", maxCount: 1 },
+		]),
+		updateUserFiles
+	);
+router.route("/:userId").get(verifyJWT, getUserById);
 router.route("/logout").post(verifyJWT, logoutUser);
 
 export default router;
