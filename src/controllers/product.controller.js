@@ -329,14 +329,12 @@ export {
 /*
 get all products ✔️
 get all user products ✔️
-get particular product (id) ✔️
+get particular product (id) ✔️ (update views)
 create product ✔️
 update product [id] ✔️
+update likes (add/remove) [id]
 delete product [id] ✔️
 
-// get user products (userID)
-// update likes (add/remove) [id]
-// update views count [id]
 // update interested users [id]
 // update interested products in user model [id]
 // send notification: liked user, interested user, received feedback

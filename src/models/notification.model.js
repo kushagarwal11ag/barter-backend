@@ -1,9 +1,25 @@
-/*
 import mongoose, { Schema } from "mongoose";
 
 const notificationSchema = new Schema(
 	{
-		type: { // feedback, interested in bartering, etc
+		productId: {
+			type: Schema.Types.ObjectId,
+			ref: "Product",
+		},
+		feedbackId: {
+			type: Schema.Types.ObjectId,
+			ref: "Feedback",
+		},
+		followedById: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+		},
+		transactionId: {
+			type: Schema.Types.ObjectId,
+			ref: "Transaction",
+		},
+		notificationType: {
+			// feedback, follow, transaction (initiated/status change/counter)
 			type: String,
 			required: true,
 		},
@@ -24,4 +40,3 @@ const notificationSchema = new Schema(
 );
 
 export const Notification = mongoose.model("Notification", notificationSchema);
-*/

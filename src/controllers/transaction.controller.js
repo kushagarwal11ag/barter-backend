@@ -392,8 +392,7 @@ export {
 /*
 get all user as initiator transactions ✔️
 get all user as recipient transactions ✔️
-get transaction details initiated by user (id) ✔️
-get transaction details initiated for user (id) ✔️
+get transaction details (id) ✔️
 initiate transaction (2 product ids) ✔️
 update transaction status [id] ✔️
 */

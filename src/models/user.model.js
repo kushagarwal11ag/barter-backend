@@ -35,14 +35,33 @@ const userSchema = new Schema(
 		phone: {
 			type: String,
 		},
-		location: {
-			type: String,
-		},
 		rating: {
 			type: Number,
 			default: 0,
 		},
-		interestedProducts: [
+		displayEmail: {
+			type: Boolean,
+			default: true,
+		},
+		displayPhone: {
+			type: Boolean,
+			default: true,
+		},
+		isVerified: {
+			type: Boolean,
+			default: false,
+		},
+		blockedUsers: [
+			{
+				type: Schema.Types.ObjectId,
+				ref: "User",
+			},
+		],
+		isBanned: {
+			type: Boolean,
+			default: false,
+		},
+		productsNotInterestedIn: [
 			{
 				type: Schema.Types.ObjectId,
 				ref: "Product",

@@ -16,6 +16,7 @@ const options = {
 	secure: true,
 };
 
+// helper methods
 const generateAccessAndRefreshTokens = async (userId) => {
 	try {
 		const user = await User.findById(userId);
@@ -42,6 +43,7 @@ const handleFileUpload = async (filePath, fileType) => {
 	return { id: uploadedFile?.public_id, url: uploadedFile?.url };
 };
 
+// controller functions
 const registerUser = asyncHandler(async (req, res) => {
 	const { name, email, password } = req.body;
 
@@ -79,7 +81,9 @@ const loginUser = asyncHandler(async (req, res) => {
 		);
 	}
 
-	const user = await User.findOne({ email });
+	const user = await User.findOne({ email }).select(
+		"-password -displayEmail -displayPhone -refreshToken"
+	);
 	if (!user) {
 		throw new ApiError(404, "User not found");
 	}
@@ -93,10 +97,6 @@ const loginUser = asyncHandler(async (req, res) => {
 		user._id
 	);
 
-	const loggedInUser = await User.findById(user._id).select(
-		"-password -refreshToken"
-	);
-
 	return res
 		.status(200)
 		.cookie("accessToken", accessToken, options)
@@ -105,7 +105,7 @@ const loginUser = asyncHandler(async (req, res) => {
 			new ApiResponse(
 				200,
 				{
-					user: loggedInUser,
+					user,
 					accessToken,
 					refreshToken,
 				},
@@ -134,14 +134,14 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "New password cannot be same as the old one");
 	}
 
-	const user = req.user?._id;
+	const user = req.user;
 	const isPasswordValid = await user.isPasswordCorrect(oldPassword);
 	if (!isPasswordValid) {
 		throw new ApiError(400, "The old password is incorrect");
 	}
 
 	user.password = newPassword;
-	await user.save({ validateBeforeSave: false });
+	await user.save();
 
 	return res
 		.status(200)
@@ -167,6 +167,8 @@ const getUserById = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
 
+	const loggedInUserId = req.user?._id;
+
 	const user = await User.aggregate([
 		{
 			$match: {
@@ -181,14 +183,14 @@ const getUserById = asyncHandler(async (req, res) => {
 				as: "product",
 				pipeline: [
 					{
-						$addFields: {
-							image: "$image.url",
+						$match: {
+							isAvailable: true,
 						},
 					},
 					{
 						$project: {
 							title: 1,
-							image: 1,
+							images: 1,
 							category: 1,
 						},
 					},
@@ -199,16 +201,31 @@ const getUserById = asyncHandler(async (req, res) => {
 			$addFields: {
 				avatar: "$avatar.url",
 				banner: "$banner.url",
+				isBlocked: {
+					$in: [loggedInUserId, "$blockedUsers"],
+				},
 			},
 		},
 		{
 			$project: {
+				email: {
+					$cond: {
+						if: "$displayEmail",
+						then: "$email",
+						else: "$$REMOVE",
+					},
+				},
+				phone: {
+					$cond: {
+						if: "$displayPhone",
+						then: "$phone",
+						else: "$$REMOVE",
+					},
+				},
 				name: 1,
 				bio: 1,
 				avatar: 1,
 				banner: 1,
-				phone: 1,
-				location: 1,
 				rating: 1,
 				product: 1,
 			},
@@ -219,9 +236,14 @@ const getUserById = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "User not found");
 	}
 
+	if (user?.[0]?.isBlocked) {
+		throw new ApiError(403, "Access denied. You are blocked by this user.");
+	}
+	delete user?.[0]?.isBlocked;
+
 	return res
 		.status(200)
-		.json(new ApiResponse(200, user, "User retrieved successfully"));
+		.json(new ApiResponse(200, user?.[0], "User retrieved successfully"));
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {

@@ -12,70 +12,57 @@ const productSchema = new Schema(
 			required: true,
 			trim: true,
 		},
-		image: {
-			id: {
-				type: String,
-				required: true,
+		images: [
+			{
+				id: String,
+				url: String,
 			},
-			url: {
-				type: String,
-				required: true,
-			},
-		},
+		],
 		condition: {
 			type: String,
-			enum: ["new", "good", "fair"],
+			enum: ["new", "good", "fair", "poor"],
 			required: true,
 		},
 		category: {
 			type: String,
 			required: true,
 		},
-		owner: {
-			type: Schema.Types.ObjectId,
-			ref: "User",
-			required: true,
+		isBarter: {
+			type: Boolean,
+			default: true,
 		},
-		/*
-		location: {
-			type: String,
-			required: true,
-		},
-		desiredProduct: {
+		barterCategory: {
 			type: String,
 			trim: true,
 		},
-		tags: [
-			{
-				type: String,
-				trim: true,
-			},
-		],
-		status: {
-			type: String, // available, traded
-			required: true,
+		barterDescription: {
+			type: String,
+			trim: true,
 		},
-		likes: [
-			{
-				type: Schema.Types.ObjectId,
-				ref: "User",
-			},
-		],
-		views: {
+		price: {
 			type: Number,
 			default: 0,
 		},
-		isEnabled: {
-			type: Boolean,
-			default: false,
-		},
-		interestedUsers: [
+		views: [
 			{
 				type: Schema.Types.ObjectId,
 				ref: "User",
 			},
 		],
-		*/
+		meetingSpot: {
+			type: String,
+			required: true,
+		},
+		isAvailable: {
+			type: Boolean,
+			default: true,
+		},
+		owner: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+			index: true,
+			required: true,
+		},
 	},
 	{
 		timestamps: true,

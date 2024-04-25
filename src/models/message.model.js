@@ -1,4 +1,3 @@
-/*
 import mongoose, { Schema } from "mongoose";
 
 const messageSchema = new Schema(
@@ -6,19 +5,22 @@ const messageSchema = new Schema(
 		from: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
+			required: true,
 		},
 		to: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
+			required: true,
 		},
-		message: {
+		content: {
 			type: String,
 			required: true,
 			trim: true,
 		},
-		isRead: {
-			type: Boolean,
-			default: false,
+		status: {
+			type: String,
+			enum: ["sent", "delivered", "read"],
+			default: "sent",
 		},
 	},
 	{
@@ -27,4 +29,3 @@ const messageSchema = new Schema(
 );
 
 export const Message = mongoose.model("Message", messageSchema);
-*/

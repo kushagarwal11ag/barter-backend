@@ -1,9 +1,8 @@
-/*
 import mongoose, { Schema } from "mongoose";
 
 const feedbackSchema = new Schema(
 	{
-		body: {
+		content: {
 			type: String,
 			required: true,
 			trim: true,
@@ -18,11 +17,11 @@ const feedbackSchema = new Schema(
 				message: "Please use integer for rating",
 			},
 		},
-		product: {
+		feedBackTo: {
 			type: Schema.Types.ObjectId,
-			ref: "Product",
+			ref: "User",
 		},
-		author: {
+		feedBackBy: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 		},
@@ -31,4 +30,3 @@ const feedbackSchema = new Schema(
 );
 
 export const Feedback = mongoose.model("Feedback", feedbackSchema);
-*/

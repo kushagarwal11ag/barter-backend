@@ -2,10 +2,14 @@ import mongoose, { Schema } from "mongoose";
 
 const transactionSchema = new Schema(
 	{
+		transactionType: {
+			type: String,
+			enum: ["barter", "sale", "hybrid"],
+			default: "barter",
+		},
 		productOffered: {
 			type: Schema.Types.ObjectId,
 			ref: "Product",
-			required: true,
 			index: true,
 		},
 		productRequested: {
@@ -14,15 +18,20 @@ const transactionSchema = new Schema(
 			required: true,
 			index: true,
 		},
+		priceOffered: {
+			type: Number,
+			default: 0,
+		},
+		priceRequested: {
+			type: Number,
+			default: 0,
+		},
 		orderStatus: {
 			type: String,
-			enum: ["pending", "accepted", "completed", "cancelled"],
+			enum: ["pending", "counter", "cancelled", "accepted", "completed"],
 			default: "pending",
 		},
-		remarks: {
-			type: String,
-		},
-		initiatedBy: {
+		initiator: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
