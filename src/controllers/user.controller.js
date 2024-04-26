@@ -82,7 +82,7 @@ const loginUser = asyncHandler(async (req, res) => {
 	}
 
 	const user = await User.findOne({ email }).select(
-		"-password -displayEmail -displayPhone -refreshToken"
+		"-password -displayEmail -displayPhone -isVerified -isBanned -refreshToken"
 	);
 	if (!user) {
 		throw new ApiError(404, "User not found");
@@ -247,9 +247,45 @@ const getUserById = asyncHandler(async (req, res) => {
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
-	const { name, bio, phone, location } = req.body;
-	if (!(name?.trim() || bio?.trim() || phone?.trim() || location?.trim())) {
+	const { name, bio, phone, displayEmail, displayPhone } = req.body;
+	if (
+		!(
+			name?.trim() ||
+			bio?.trim() ||
+			phone?.trim() ||
+			displayEmail !== undefined ||
+			displayPhone !== undefined
+		)
+	) {
 		throw new ApiError(400, "No field requested for update");
+	}
+
+	if (name) {
+		const { error } = validateUser({ name });
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+	if (bio) {
+		const { error } = validateUser({ bio });
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+	if (phone) {
+		const { error } = validateUser({ phone });
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
 	}
 
 	await User.findByIdAndUpdate(req.user?._id, {
@@ -257,7 +293,14 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 			name,
 			bio,
 			phone,
-			location,
+			displayEmail:
+				displayEmail !== undefined
+					? displayEmail
+					: req.user?.displayEmail,
+			displayPhone:
+				displayPhone !== undefined
+					? displayPhone
+					: req.user?.displayPhone,
 		},
 	});
 

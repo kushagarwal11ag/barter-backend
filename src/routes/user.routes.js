@@ -12,6 +12,7 @@ import {
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import verifyJWT from "../middlewares/auth.middleware.js";
+import checkVerificationAndBan from "../middlewares/checkVerificationAndBan.middleware.js";
 
 const router = Router();
 
@@ -20,20 +21,23 @@ router.route("/login").post(loginUser);
 router.route("/refresh").post(refreshAccessToken);
 
 // secured routes
-router.route("/me/password").patch(verifyJWT, changeCurrentPassword);
+router
+	.route("/me/password")
+	.patch(verifyJWT, checkVerificationAndBan, changeCurrentPassword);
 router
 	.route("/me")
-	.get(verifyJWT, getCurrentUser)
-	.put(verifyJWT, updateUserDetails)
+	.get(verifyJWT, checkVerificationAndBan, getCurrentUser)
+	.put(verifyJWT, checkVerificationAndBan, updateUserDetails)
 	.patch(
 		verifyJWT,
+		checkVerificationAndBan,
 		upload.fields([
 			{ name: "avatar", maxCount: 1 },
 			{ name: "banner", maxCount: 1 },
 		]),
 		updateUserFiles
 	);
-router.route("/:userId").get(verifyJWT, getUserById);
-router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/:userId").get(verifyJWT, checkVerificationAndBan, getUserById);
+router.route("/logout").post(verifyJWT, checkVerificationAndBan, logoutUser);
 
 export default router;

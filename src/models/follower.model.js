@@ -11,4 +11,5 @@ const followerSchema = new Schema({
 	},
 });
 
-export const Follower = mongoose.model("Follower", followerSchema);
+const Follower = mongoose.model("Follower", followerSchema);
+export default Follower;
