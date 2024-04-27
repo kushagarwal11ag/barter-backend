@@ -121,9 +121,6 @@ const loginUser = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
 	const { oldPassword, newPassword } = req.body;
-	if (!oldPassword || !newPassword) {
-		throw new ApiError(400, "Both old and new passwords are required");
-	}
 
 	const { error: oldPasswordError } = validateUser({ password: oldPassword });
 	const { error: newPasswordError } = validateUser({ password: newPassword });
@@ -253,44 +250,19 @@ const getUserById = asyncHandler(async (req, res) => {
 
 const updateUserDetails = asyncHandler(async (req, res) => {
 	const { name, bio, phone, displayEmail, displayPhone } = req.body;
-	if (
-		!(
-			name?.trim() ||
-			bio?.trim() ||
-			phone?.trim() ||
-			displayEmail !== undefined ||
-			displayPhone !== undefined
-		)
-	) {
-		throw new ApiError(400, "No field requested for update");
-	}
 
-	if (name) {
-		const { error } = validateUser({ name });
-		if (error) {
-			throw new ApiError(
-				400,
-				`Validation error: ${error.details[0].message}`
-			);
-		}
-	}
-	if (bio) {
-		const { error } = validateUser({ bio });
-		if (error) {
-			throw new ApiError(
-				400,
-				`Validation error: ${error.details[0].message}`
-			);
-		}
-	}
-	if (phone) {
-		const { error } = validateUser({ phone });
-		if (error) {
-			throw new ApiError(
-				400,
-				`Validation error: ${error.details[0].message}`
-			);
-		}
+	const { error } = validateUser({
+		name,
+		bio,
+		phone,
+		displayEmail,
+		displayPhone,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
 	}
 
 	await User.findByIdAndUpdate(req.user?._id, {
@@ -298,14 +270,8 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 			name,
 			bio,
 			phone,
-			displayEmail:
-				displayEmail !== undefined
-					? displayEmail
-					: req.user?.displayEmail,
-			displayPhone:
-				displayPhone !== undefined
-					? displayPhone
-					: req.user?.displayPhone,
+			displayEmail,
+			displayPhone,
 		},
 	});
 

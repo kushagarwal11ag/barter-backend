@@ -1,5 +1,9 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import Product from "../models/product.model.js";
+import User from "../models/user.model.js";
+import Transaction from "../models/transaction.model.js";
+import Notification from "../models/notification.model.js";
+import { validateProduct } from "../utils/validators.js";
 import {
 	uploadOnCloudinary,
 	deleteFromCloudinary,
@@ -169,46 +173,97 @@ const getProductById = asyncHandler(async (req, res) => {
 });
 
 const createProduct = asyncHandler(async (req, res) => {
-	const { title, description, condition, category } = req.body;
-	const imageLocalPath = req.file?.path;
+	const {
+		title,
+		description,
+		condition,
+		category,
+		isBarter,
+		barterCategory,
+		barterDescription,
+		price,
+		meetingSpot,
+		isAvailable,
+	} = req.body;
+	const files = req.files;
 
-	if (
-		!title.trim() ||
-		!description.trim() ||
-		!condition.trim() ||
-		!category.trim()
-	) {
-		throw new ApiError(400, "Fields required");
-	}
-
-	if (!imageLocalPath) {
-		throw new ApiError(400, "Product image required");
-	}
-
-	if (
-		!(condition === "new" || condition === "fair" || condition === "good")
-	) {
-		throw new ApiError(400, "Condition does not meet the requirements");
-	}
-
-	const image = await uploadOnCloudinary(imageLocalPath);
-	if (!image?.url) {
+	const { error } = validateProduct({
+		title,
+		description,
+		condition,
+		category,
+		meetingSpot,
+		isAvailable,
+	});
+	if (error) {
 		throw new ApiError(
-			500,
-			"An unexpected error occurred while uploading image"
+			400,
+			`Validation error: ${error.details[0].message}`
 		);
+	}
+
+	if (isBarter) {
+		const { error } = validateProduct({
+			isBarter,
+			barterCategory,
+			barterDescription,
+		});
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+
+	if (price) {
+		const { error } = validateProduct({
+			price,
+		});
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+
+	if (!files || !files.length) {
+		throw new ApiError(400, "Product image is required");
+	}
+
+	const images = [];
+	for (const file of files) {
+		try {
+			const image = await uploadOnCloudinary(file.path);
+			if (!image.url) {
+				throw new Error("Failed to upload image");
+			}
+			images.push({
+				id: image.public_id,
+				url: image.url,
+			});
+		} catch (error) {
+			throw new ApiError(
+				500,
+				`An error occurred while uploading images: ${error.message}`
+			);
+		}
 	}
 
 	const product = await Product.create({
 		title,
 		description,
-		image: {
-			id: image?.public_id,
-			url: image?.url,
-		},
+		images,
 		condition,
 		category,
-		owner: req.user?._id,
+		isBarter,
+		barterCategory,
+		barterDescription,
+		price,
+		meetingSpot,
+		isAvailable,
+		owner: req.user._id,
 	});
 
 	return res
@@ -302,7 +357,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 	if (!product) {
 		throw new ApiError(404, "Product not found");
 	}
-	if (product.owner.toString() !== req.user?._id.toString()) {
+	if (product.owner.toString() !== req.user._id.toString()) {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
@@ -311,6 +366,22 @@ const deleteProduct = asyncHandler(async (req, res) => {
 	}
 
 	await Product.findByIdAndDelete(productId);
+	await User.updateMany({
+		$pull: {
+			wishlist: productId,
+		},
+	});
+	await Transaction.deleteMany({
+		$or: [
+			{
+				productOffered: productId,
+			},
+			{
+				productRequested: productId,
+			},
+		],
+	});
+	await Notification.deleteMany({ productId });
 
 	return res
 		.status(200)
@@ -327,11 +398,11 @@ export {
 };
 
 /*
-get all products ✔️
-get all user products ✔️
-get particular product (id) ✔️ (update views)
+get all products
+get all user products
+get particular product (id) (update views)
 create product ✔️
-update product [id] ✔️
+update product [id]
 update likes (add/remove) [id]
 delete product [id] ✔️
 
