@@ -61,12 +61,6 @@ const userSchema = new Schema(
 			type: Boolean,
 			default: false,
 		},
-		productsNotInterestedIn: [
-			{
-				type: Schema.Types.ObjectId,
-				ref: "Product",
-			},
-		],
 		wishlist: [
 			{
 				type: Schema.Types.ObjectId,

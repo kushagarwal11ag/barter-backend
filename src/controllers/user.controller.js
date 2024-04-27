@@ -2,6 +2,11 @@ import mongoose, { isValidObjectId } from "mongoose";
 import jwt from "jsonwebtoken";
 
 import User from "../models/user.model.js";
+import Product from "../models/product.model.js";
+import Transaction from "../models/transaction.model.js";
+import Notification from "../models/notification.model.js";
+import Message from "../models/message.model.js";
+import Feedback from "../models/feedback.model.js";
 import { validateUser } from "../utils/validators.js";
 import {
 	uploadOnCloudinary,
@@ -372,6 +377,48 @@ const logoutUser = asyncHandler(async (req, res) => {
 		.json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
+const deleteAccount = asyncHandler(async (req, res) => {
+	const userId = req.user?._id;
+
+	await User.deleteOne({ _id: userId });
+	await Product.deleteMany({ owner: userId });
+	await Transaction.deleteMany({
+		$or: [
+			{
+				initiator: userId,
+			},
+			{
+				recipient: userId,
+			},
+		],
+	});
+	await Notification.deleteMany({ user: userId });
+	await Message.deleteMany({
+		$or: [
+			{
+				from: userId,
+			},
+			{
+				to: userId,
+			},
+		],
+	});
+	await Feedback.deleteMany({
+		$or: [
+			{
+				feedBackTo: userId,
+			},
+			{
+				feedBackBy: userId,
+			},
+		],
+	});
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Account deleted successfully"));
+});
+
 const refreshAccessToken = asyncHandler(async (req, res) => {
 	const incomingRefreshToken =
 		req.cookies?.refreshToken || req.body?.refreshToken;
@@ -381,7 +428,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 	}
 
 	try {
-		const decodedToken = await jwt.verify(
+		const decodedToken = jwt.verify(
 			incomingRefreshToken,
 			process.env.REFRESH_TOKEN_SECRET
 		);
@@ -419,6 +466,7 @@ export {
 	updateUserDetails,
 	updateUserFiles,
 	logoutUser,
+	deleteAccount,
 	refreshAccessToken,
 };
 
@@ -427,12 +475,10 @@ register user ✔️
 login user ✔️
 change password ✔️
 get current user ✔️
-get user -> products ✔️ (follower count, feedback)
+get user by id ✔️
 update user details ✔️
-update files (avatar, banner) ✔️
+update files ✔️
 logout user ✔️
+delete account ✔️
 refresh access token ✔️
-
-// retrieve notifications
-// follow / un-follow user (id)
 */

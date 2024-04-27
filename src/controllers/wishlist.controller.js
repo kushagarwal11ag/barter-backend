@@ -128,6 +128,22 @@ const removeFromWishlist = asyncHandler(async (req, res) => {
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
+
+	await User.findByIdAndUpdate(req.user?._id, {
+		$pull: {
+			wishlist: productId,
+		},
+	});
+
+	return res
+		.status(200)
+		.json(
+			new ApiResponse(
+				200,
+				{},
+				"Product removed from wishlist successfully"
+			)
+		);
 });
 
 export { getUserWishlist, addToWishlist, removeFromWishlist };
@@ -135,5 +151,5 @@ export { getUserWishlist, addToWishlist, removeFromWishlist };
 /*
 get user wishlist ✔️
 add to user wishlist ✔️
-remove from user wishlist
+remove from user wishlist ✔️
 */
