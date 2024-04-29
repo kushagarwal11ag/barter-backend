@@ -13,14 +13,27 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
 const getAllProducts = asyncHandler(async (req, res) => {
+	const blockedUsers =
+		req.user.blockedUsers?.map((id) => id.toString()) || [];
+
 	const products = await Product.aggregate([
 		{
 			$lookup: {
 				from: "users",
 				localField: "owner",
 				foreignField: "_id",
-				as: "user",
+				as: "ownerDetails",
 				pipeline: [
+					{
+						$match: {
+							$expr: {
+								$and: [
+									{ $not: [{ $in: ["$_id", blockedUsers] }] }, // Ensure the owner is not in the blockedUsers list
+									{ $eq: ["$isBanned", false] }, // Ensure the owner is not banned
+								],
+							},
+						},
+					},
 					{
 						$addFields: {
 							avatar: "$avatar.url",
@@ -36,10 +49,14 @@ const getAllProducts = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$match: {
+				isAvailable: true,
+				"ownerDetails.0": { $exists: true }, // Ensure there is at least one non-blocked, non-banned owner
+			},
+		},
+		{
 			$addFields: {
-				user: {
-					$first: "$user",
-				},
+				owner: { $arrayElemAt: ["$ownerDetails", 0] }, // Flatten the owner details
 				image: "$image.url",
 			},
 		},
@@ -53,8 +70,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
 				title: 1,
 				image: 1,
 				category: 1,
-				user: 1,
-				createdAt: 1,
+				owner: 1,
 			},
 		},
 	]);
@@ -74,7 +90,7 @@ const getUserProducts = asyncHandler(async (req, res) => {
 	const products = await Product.aggregate([
 		{
 			$match: {
-				owner: new mongoose.Types.ObjectId(req.user?._id),
+				owner: new mongoose.Types.ObjectId(req.user._id),
 			},
 		},
 		{
@@ -90,11 +106,8 @@ const getUserProducts = asyncHandler(async (req, res) => {
 		{
 			$project: {
 				title: 1,
-				description: 1,
 				image: 1,
-				condition: 1,
 				category: 1,
-				createdAt: 1,
 			},
 		},
 	]);
@@ -116,10 +129,14 @@ const getProductById = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
 
+	const blockedUsers =
+		req.user.blockedUsers?.map((id) => id.toString()) || [];
+
 	const product = await Product.aggregate([
 		{
 			$match: {
 				_id: new mongoose.Types.ObjectId(productId),
+				isAvailable: true,
 			},
 		},
 		{
@@ -127,8 +144,18 @@ const getProductById = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "owner",
 				foreignField: "_id",
-				as: "owner",
+				as: "ownerDetails",
 				pipeline: [
+					{
+						$match: {
+							$expr: {
+								$and: [
+									{ $not: [{ $in: ["$_id", blockedUsers] }] },
+									{ $eq: ["$isBanned", false] },
+								],
+							},
+						},
+					},
 					{
 						$addFields: {
 							avatar: "$avatar.url",
@@ -144,11 +171,22 @@ const getProductById = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$match: {
+				"ownerDetails.0": { $exists: true },
+			},
+		},
+		// {
+		// 	$addToSet: {
+		// 		views: req.user._id,
+		// 	},
+		// },
+		{
 			$addFields: {
-				owner: {
-					$first: "$owner",
-				},
+				owner: { $arrayElemAt: ["$ownerDetails", 0] },
 				image: "$image.url",
+				viewCount: {
+					$size: "$views",
+				},
 			},
 		},
 		{
@@ -158,13 +196,19 @@ const getProductById = asyncHandler(async (req, res) => {
 				image: 1,
 				condition: 1,
 				category: 1,
+				isBarter: 1,
+				barterCategory: 1,
+				barterDescription: 1,
+				price: 1,
+				viewCount: 1,
+				meetingSpot: 1,
 				owner: 1,
 			},
 		},
 	]);
 
-	if (product.length === 0) {
-		throw new ApiError(404, "Product not found");
+	if (!product.length) {
+		throw new ApiError(404, "Product not found or Access denied");
 	}
 
 	return res
@@ -185,7 +229,11 @@ const createProduct = asyncHandler(async (req, res) => {
 		meetingSpot,
 		isAvailable,
 	} = req.body;
-	const files = req.files;
+
+	const imageLocalPath = req.file?.path;
+	if (!imageLocalPath) {
+		throw new ApiError(400, "Image file required");
+	}
 
 	const { error } = validateProduct({
 		title,
@@ -228,33 +276,21 @@ const createProduct = asyncHandler(async (req, res) => {
 		}
 	}
 
-	if (!files || !files.length) {
-		throw new ApiError(400, "Product image is required");
-	}
-
-	const images = [];
-	for (const file of files) {
-		try {
-			const image = await uploadOnCloudinary(file.path);
-			if (!image.url) {
-				throw new Error("Failed to upload image");
-			}
-			images.push({
-				id: image.public_id,
-				url: image.url,
-			});
-		} catch (error) {
-			throw new ApiError(
-				500,
-				`An error occurred while uploading images: ${error.message}`
-			);
-		}
+	const image = await uploadOnCloudinary(imageLocalPath);
+	if (!image?.url) {
+		throw new ApiError(
+			500,
+			"An unexpected error occurred while uploading image"
+		);
 	}
 
 	const product = await Product.create({
 		title,
 		description,
-		images,
+		image: {
+			id: image.public_id,
+			url: image.url,
+		},
 		condition,
 		category,
 		isBarter,
@@ -272,32 +308,31 @@ const createProduct = asyncHandler(async (req, res) => {
 });
 
 const updateProduct = asyncHandler(async (req, res) => {
-	const { title, description, condition, category } = req.body;
+	const {
+		description,
+		barterCategory,
+		barterDescription,
+		price,
+		meetingSpot,
+		isAvailable,
+	} = req.body;
 	const imageLocalPath = req.file?.path;
 	const { productId } = req.params;
 
-	let image;
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
 
-	if (
-		!(
-			title?.trim() ||
-			description?.trim() ||
-			condition?.trim() ||
-			category?.trim() ||
-			imageLocalPath
-		)
-	) {
-		throw new ApiError(400, "No field requested for update");
-	}
-
-	if (
-		condition &&
-		!(condition === "new" || condition === "fair" || condition === "good")
-	) {
-		throw new ApiError(400, "Condition does not meet the requirements");
+	const { error } = validateProduct({
+		description,
+		meetingSpot,
+		isAvailable,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
 	}
 
 	const product = await Product.findById(productId);
@@ -305,10 +340,36 @@ const updateProduct = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Product not found");
 	}
 
-	if (product.owner.toString() !== req.user?._id.toString()) {
+	if (product.owner.toString() !== req.user._id.toString()) {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
+	if (product.isBarter) {
+		const { error } = validateProduct({
+			barterCategory,
+			barterDescription,
+		});
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+
+	if (price) {
+		const { error } = validateProduct({
+			price,
+		});
+		if (error) {
+			throw new ApiError(
+				400,
+				`Validation error: ${error.details[0].message}`
+			);
+		}
+	}
+
+	let image;
 	if (imageLocalPath) {
 		image = await uploadOnCloudinary(imageLocalPath);
 		if (!image?.url) {
@@ -319,7 +380,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 		}
 
 		if (product.image.id) {
-			await deleteFromCloudinary(product.image?.id);
+			await deleteFromCloudinary(product.image.id);
 		}
 	}
 
@@ -327,10 +388,12 @@ const updateProduct = asyncHandler(async (req, res) => {
 		productId,
 		{
 			$set: {
-				title,
 				description,
-				condition,
-				category,
+				barterCategory: product.isBarter ? barterCategory : null,
+				barterDescription: product.isBarter ? barterDescription : null,
+				price: price >= 0 ? price : product.price,
+				meetingSpot,
+				isAvailable,
 				image: {
 					id: image ? image.public_id : product.image.id,
 					url: image ? image.url : product.image.url,
@@ -398,15 +461,10 @@ export {
 };
 
 /*
-get all products
-get all user products
-get particular product (id) (update views)
+get all products ✔️
+get all user products ✔️
+get particular product (id) ✔️ (update views)
 create product ✔️
-update product [id]
-update likes (add/remove) [id]
+update product [id] ✔️
 delete product [id] ✔️
-
-// update interested users [id]
-// update interested products in user model [id]
-// send notification: liked user, interested user, received feedback
 */

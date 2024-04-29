@@ -60,6 +60,7 @@ const userSchema = new Schema(
 		isBanned: {
 			type: Boolean,
 			default: false,
+			index: true,
 		},
 		wishlist: [
 			{

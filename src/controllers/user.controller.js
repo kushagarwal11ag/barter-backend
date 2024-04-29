@@ -192,7 +192,7 @@ const getUserById = asyncHandler(async (req, res) => {
 					{
 						$project: {
 							title: 1,
-							images: 1,
+							image: 1,
 							category: 1,
 						},
 					},

@@ -12,12 +12,16 @@ const productSchema = new Schema(
 			required: true,
 			trim: true,
 		},
-		images: [
-			{
-				id: String,
-				url: String,
+		image: {
+			id: {
+				type: String,
+				required: true,
 			},
-		],
+			url: {
+				type: String,
+				required: true,
+			},
+		},
 		condition: {
 			type: String,
 			enum: ["new", "good", "fair", "poor"],
@@ -56,6 +60,7 @@ const productSchema = new Schema(
 		isAvailable: {
 			type: Boolean,
 			default: true,
+			index: true
 		},
 		owner: {
 			type: Schema.Types.ObjectId,
