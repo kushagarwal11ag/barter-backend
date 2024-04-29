@@ -129,10 +129,19 @@ const getProductById = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
 
+	const product = await Product.findByIdAndUpdate(productId, {
+		$addToSet: {
+			view: req.user._id,
+		},
+	});
+	if (!product) {
+		throw new ApiError(404, "Product not found");
+	}
+
 	const blockedUsers =
 		req.user.blockedUsers?.map((id) => id.toString()) || [];
 
-	const product = await Product.aggregate([
+	const getProduct = await Product.aggregate([
 		{
 			$match: {
 				_id: new mongoose.Types.ObjectId(productId),
@@ -175,11 +184,6 @@ const getProductById = asyncHandler(async (req, res) => {
 				"ownerDetails.0": { $exists: true },
 			},
 		},
-		// {
-		// 	$addToSet: {
-		// 		views: req.user._id,
-		// 	},
-		// },
 		{
 			$addFields: {
 				owner: { $arrayElemAt: ["$ownerDetails", 0] },
@@ -213,7 +217,9 @@ const getProductById = asyncHandler(async (req, res) => {
 
 	return res
 		.status(200)
-		.json(new ApiResponse(200, product, "Product retrieved successfully"));
+		.json(
+			new ApiResponse(200, getProduct, "Product retrieved successfully")
+		);
 });
 
 const createProduct = asyncHandler(async (req, res) => {
@@ -303,8 +309,8 @@ const createProduct = asyncHandler(async (req, res) => {
 	});
 
 	return res
-		.status(200)
-		.json(new ApiResponse(200, product, "Product created successfully"));
+		.status(201)
+		.json(new ApiResponse(201, product, "Product created successfully"));
 });
 
 const updateProduct = asyncHandler(async (req, res) => {
@@ -463,7 +469,7 @@ export {
 /*
 get all products ✔️
 get all user products ✔️
-get particular product (id) ✔️ (update views)
+get particular product (id) (update views) ✔️
 create product ✔️
 update product [id] ✔️
 delete product [id] ✔️

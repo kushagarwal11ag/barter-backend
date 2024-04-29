@@ -17,11 +17,11 @@ const feedbackSchema = new Schema(
 				message: "Please use integer for rating",
 			},
 		},
-		feedBackTo: {
+		feedbackFor: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 		},
-		feedBackBy: {
+		feedbackBy: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
 		},
