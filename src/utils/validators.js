@@ -49,6 +49,12 @@ const feedbackSchema = Joi.object({
 	rating: Joi.number().min(1).max(5).integer(),
 }).or("content", "rating");
 
+const notificationSchema = Joi.object({
+	notificationType: Joi.string(),
+	content: Joi.string().trim().min(5).max(50),
+	isRead: Joi.boolean(),
+});
+
 const validateUser = (userData) => {
 	return userSchema.validate(userData);
 };
@@ -58,5 +64,13 @@ const validateProduct = (productData) => {
 const validateFeedback = (feedbackData) => {
 	return feedbackSchema.validate(feedbackData);
 };
+const validateNotification = (notificationData) => {
+	return notificationSchema.validate(notificationData);
+};
 
-export { validateUser, validateProduct, validateFeedback };
+export {
+	validateUser,
+	validateProduct,
+	validateFeedback,
+	validateNotification,
+};

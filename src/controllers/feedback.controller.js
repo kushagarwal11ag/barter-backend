@@ -1,4 +1,4 @@
-import { isValidObjectId } from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 import Feedback from "../models/feedback.model.js";
 import User from "../models/user.model.js";
 import { validateFeedback } from "../utils/validators.js";
@@ -14,7 +14,7 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 	const feedbacks = await Feedback.aggregate([
 		{
 			$match: {
-				feedbackFor: userId,
+				feedbackFor: new mongoose.Types.ObjectId(userId),
 			},
 		},
 		{
@@ -31,7 +31,7 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
-                            _id: 1,
+							_id: 1,
 							name: 1,
 							avatar: 1,
 						},
@@ -64,7 +64,7 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 	const feedbacks = await Feedback.aggregate([
 		{
 			$match: {
-				feedbackBy: req.user._id,
+				feedbackBy: new mongoose.Types.ObjectId(req.user._id),
 			},
 		},
 		{
@@ -91,7 +91,7 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-                _id: 0,
+				_id: 0,
 				content: 1,
 				rating: 1,
 				feedbackFor: 1,
