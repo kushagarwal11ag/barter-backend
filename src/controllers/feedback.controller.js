@@ -1,6 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import Feedback from "../models/feedback.model.js";
 import User from "../models/user.model.js";
+import Notification from "../models/notification.model.js";
 import { validateFeedback } from "../utils/validators.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -134,11 +135,18 @@ const createFeedback = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Cannot post feedback as user not found");
 	}
 
-	const feedback = await Feedback.create({
+	const feedback = await Feedback.insertOne({
 		content,
 		rating,
 		feedbackFor: userId,
 		feedbackBy: req.user._id,
+	});
+
+	await Notification.create({
+		feedbackId: feedback.insertedId,
+		notificationType: "feedback",
+		content: "You received a feedback",
+		user: userId,
 	});
 
 	return res
@@ -221,7 +229,7 @@ export {
 /*
 get all user feedbacks ✔️
 get all my feedbacks ✔️
-create feedback ✔️
+create feedback - send notification ✔️
 update feedback ✔️
 delete feedback ✔️
 */

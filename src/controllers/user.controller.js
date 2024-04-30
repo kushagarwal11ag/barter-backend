@@ -442,7 +442,7 @@ login user ✔️
 change password ✔️
 get current user ✔️
 get current user details => get followers + count, following + count, feedbacks, notifications, products, transactions ❌
-get user by id ✔️, => get followers + count, following + count, feedbacks, notifications, products, transactions ❌
+get user by id ✔️ => get followers + count, following + count, feedbacks, notifications, products, transactions ❌
 update user details ✔️
 update files ✔️
 logout user ✔️

@@ -44,18 +44,26 @@ const productSchema = Joi.object({
 	"isAvailable"
 );
 
+const transactionSchema = Joi.object({
+	transactionType: Joi.string().valid("barter", "sale", "hybrid"),
+	priceOffered: Joi.number(),
+	priceRequested: Joi.number(),
+	orderStatus: Joi.string().valid(
+		"pending",
+		"accepted",
+		"completed",
+		"cancelled",
+		"counter"
+	),
+}).or("transactionType", "priceOffered", "priceRequested", "orderStatus");
+
 const feedbackSchema = Joi.object({
 	content: Joi.string().trim().min(10).max(300),
 	rating: Joi.number().min(1).max(5).integer(),
 }).or("content", "rating");
 
 const notificationSchema = Joi.object({
-	notificationType: Joi.string().valid(
-		"feedback",
-		"product",
-		"transaction",
-		"follow"
-	),
+	notificationType: Joi.string().valid("feedback", "transaction", "follow"),
 	content: Joi.string().trim().min(5).max(50),
 	isRead: Joi.boolean(),
 });
@@ -65,6 +73,9 @@ const validateUser = (userData) => {
 };
 const validateProduct = (productData) => {
 	return productSchema.validate(productData);
+};
+const validateTransaction = (transactionData) => {
+	return transactionSchema.validate(transactionData);
 };
 const validateFeedback = (feedbackData) => {
 	return feedbackSchema.validate(feedbackData);
@@ -76,6 +87,7 @@ const validateNotification = (notificationData) => {
 export {
 	validateUser,
 	validateProduct,
+	validateTransaction,
 	validateFeedback,
 	validateNotification,
 };

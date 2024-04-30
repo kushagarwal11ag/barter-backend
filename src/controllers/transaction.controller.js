@@ -1,6 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import Transaction from "../models/transaction.model.js";
 import Product from "../models/product.model.js";
+import { validateTransaction } from "../utils/validators.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
@@ -282,8 +283,13 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 });
 
 const initiateTransaction = asyncHandler(async (req, res) => {
-	const { productOfferedId, remarks } = req.body;
-	const { productRequestedId } = req.params;
+	const {
+		transactionType,
+		productOfferedId,
+		productRequestedId,
+		priceOffered,
+		priceRequested,
+	} = req.body;
 
 	if (
 		!productOfferedId ||
@@ -292,6 +298,18 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		!isValidObjectId(productRequestedId)
 	) {
 		throw new ApiError(400, "Invalid or missing product(s) ID");
+	}
+
+	const { error } = validateTransaction({
+		transactionType,
+		priceOffered,
+		priceRequested,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
 	}
 
 	const productOffered = await Product.findById(productOfferedId);
@@ -307,7 +325,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 	}
 
-	if (productOffered.owner.toString() !== req.user?._id.toString()) {
+	if (productOffered.owner.toString() !== req.user._id.toString()) {
 		throw new ApiError(403, "Access Forbidden.");
 	}
 	if (productRequested.owner.toString() === req.user?._id.toString()) {
@@ -315,30 +333,24 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 	}
 
 	const existingTransaction = await Transaction.findOne({
-		$or: [
-			{
-				productOffered: productOfferedId,
-				productRequested: productRequestedId,
-			},
-			{
-				productOffered: productRequestedId,
-				productRequested: productOfferedId,
-			},
-		],
+		productOffered: productOfferedId,
+		productRequested: productRequestedId,
 	});
 
 	if (existingTransaction) {
 		throw new ApiError(
 			409,
-			"A transaction with these products already exists."
+			"A transaction between these products already exists."
 		);
 	}
 
 	const transaction = await Transaction.create({
+		transactionType,
 		productOffered: productOfferedId,
 		productRequested: productRequestedId,
-		remarks,
-		initiatedBy: req.user?._id,
+		priceOffered,
+		priceRequested,
+		initiator: req.user._id,
 		recipient: productRequested.owner,
 	});
 
@@ -390,9 +402,9 @@ export {
 };
 
 /*
-get all user as initiator transactions ✔️
-get all user as recipient transactions ✔️
-get transaction details (id) ✔️
+get all user as initiator transactions
+get all user as recipient transactions
+get transaction details (id)
 initiate transaction (2 product ids) ✔️
-update transaction status [id] ✔️
+update transaction status [id]
 */

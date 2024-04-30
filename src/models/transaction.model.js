@@ -10,6 +10,7 @@ const transactionSchema = new Schema(
 		productOffered: {
 			type: Schema.Types.ObjectId,
 			ref: "Product",
+			required: true,
 			index: true,
 		},
 		productRequested: {

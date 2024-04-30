@@ -2,10 +2,6 @@ import mongoose, { Schema } from "mongoose";
 
 const notificationSchema = new Schema(
 	{
-		productId: {
-			type: Schema.Types.ObjectId,
-			ref: "Product",
-		},
 		feedbackId: {
 			type: Schema.Types.ObjectId,
 			ref: "Feedback",
