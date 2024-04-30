@@ -6,7 +6,7 @@ const userSchema = Joi.object({
 	bio: Joi.string().trim().min(10).max(300),
 	password: Joi.string().min(8).max(20),
 	phone: Joi.string().pattern(new RegExp("^[0-9]{10}$")),
-	rating: Joi.number(),
+	rating: Joi.number().min(1).max(5).integer(),
 	displayEmail: Joi.boolean(),
 	displayPhone: Joi.boolean(),
 }).or(
@@ -28,7 +28,7 @@ const productSchema = Joi.object({
 	isBarter: Joi.boolean(),
 	barterCategory: Joi.string().trim().min(3).max(30),
 	barterDescription: Joi.string().trim(),
-	price: Joi.number(),
+	price: Joi.number().min(0),
 	meetingSpot: Joi.string().trim().min(10).max(100),
 	isAvailable: Joi.boolean(),
 }).or(
@@ -46,27 +46,15 @@ const productSchema = Joi.object({
 
 const transactionSchema = Joi.object({
 	transactionType: Joi.string().valid("barter", "sale", "hybrid"),
-	priceOffered: Joi.number(),
-	priceRequested: Joi.number(),
-	orderStatus: Joi.string().valid(
-		"pending",
-		"accepted",
-		"completed",
-		"cancelled",
-		"counter"
-	),
+	priceOffered: Joi.number().min(0),
+	priceRequested: Joi.number().min(0),
+	orderStatus: Joi.string().valid("accept", "complete", "cancel", "counter"),
 }).or("transactionType", "priceOffered", "priceRequested", "orderStatus");
 
 const feedbackSchema = Joi.object({
 	content: Joi.string().trim().min(10).max(300),
 	rating: Joi.number().min(1).max(5).integer(),
 }).or("content", "rating");
-
-const notificationSchema = Joi.object({
-	notificationType: Joi.string().valid("feedback", "transaction", "follow"),
-	content: Joi.string().trim().min(5).max(50),
-	isRead: Joi.boolean(),
-});
 
 const validateUser = (userData) => {
 	return userSchema.validate(userData);
@@ -80,14 +68,5 @@ const validateTransaction = (transactionData) => {
 const validateFeedback = (feedbackData) => {
 	return feedbackSchema.validate(feedbackData);
 };
-const validateNotification = (notificationData) => {
-	return notificationSchema.validate(notificationData);
-};
 
-export {
-	validateUser,
-	validateProduct,
-	validateTransaction,
-	validateFeedback,
-	validateNotification,
-};
+export { validateUser, validateProduct, validateTransaction, validateFeedback };

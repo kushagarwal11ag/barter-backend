@@ -479,8 +479,8 @@ export {
 /*
 get all products ✔️
 get all user products ✔️
-get particular product (id) (update views) ✔️
+get particular product (update views) ✔️
 create product ✔️
-update product [id] ✔️
-delete product [id] ✔️
+update product ✔️ - do not update if in transaction
+delete product ✔️
 */

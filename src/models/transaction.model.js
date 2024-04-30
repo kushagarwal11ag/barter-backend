@@ -16,7 +16,6 @@ const transactionSchema = new Schema(
 		productRequested: {
 			type: Schema.Types.ObjectId,
 			ref: "Product",
-			required: true,
 			index: true,
 		},
 		priceOffered: {
@@ -29,7 +28,7 @@ const transactionSchema = new Schema(
 		},
 		orderStatus: {
 			type: String,
-			enum: ["pending", "counter", "cancelled", "accepted", "completed"],
+			enum: ["pending", "counter", "cancel", "accept", "complete"],
 			default: "pending",
 		},
 		initiator: {
@@ -41,7 +40,6 @@ const transactionSchema = new Schema(
 		recipient: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
-			required: true,
 			index: true,
 		},
 	},

@@ -15,8 +15,8 @@ const notificationSchema = new Schema(
 			ref: "Transaction",
 		},
 		notificationType: {
-			// feedback, follow, transaction (initiated/status change/counter)
 			type: String,
+			enum: ["feedback", "follow", "transaction"],
 			required: true,
 		},
 		content: {

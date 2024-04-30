@@ -1,6 +1,7 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import Transaction from "../models/transaction.model.js";
 import Product from "../models/product.model.js";
+import Notification from "../models/notification.model.js";
 import { validateTransaction } from "../utils/validators.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -10,7 +11,7 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
-				initiatedBy: new mongoose.Types.ObjectId(req.user?._id),
+				initiator: new mongoose.Types.ObjectId(req.user?._id),
 			},
 		},
 		{
@@ -36,6 +37,28 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$lookup: {
+				from: "users",
+				localField: "recipient",
+				foreignField: "_id",
+				as: "recipient",
+				pipeline: [
+					{
+						$addFields: {
+							avatar: "$avatar.url",
+						},
+					},
+					{
+						$project: {
+							_id: 0,
+							name: 1,
+							avatar: 1,
+						},
+					},
+				],
+			},
+		},
+		{
 			$sort: {
 				createdAt: -1,
 			},
@@ -45,12 +68,19 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 				product: {
 					$first: "$product",
 				},
+				recipient: {
+					$first: "$recipient",
+				},
 			},
 		},
 		{
 			$project: {
+				transactionType: 1,
 				product: 1,
+				priceOffered: 1,
+				priceRequested: 1,
 				orderStatus: 1,
+				recipient: 1,
 			},
 		},
 	]);
@@ -96,6 +126,28 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$lookup: {
+				from: "users",
+				localField: "initiator",
+				foreignField: "_id",
+				as: "initiator",
+				pipeline: [
+					{
+						$addFields: {
+							avatar: "$avatar.url",
+						},
+					},
+					{
+						$project: {
+							_id: 0,
+							name: 1,
+							avatar: 1,
+						},
+					},
+				],
+			},
+		},
+		{
 			$sort: {
 				createdAt: -1,
 			},
@@ -105,12 +157,19 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 				product: {
 					$first: "$product",
 				},
+				initiator: {
+					$first: "$initiator",
+				},
 			},
 		},
 		{
 			$project: {
+				transactionType: 1,
 				product: 1,
+				priceOffered: 1,
+				priceRequested: 1,
 				orderStatus: 1,
+				initiator: 1,
 			},
 		},
 	]);
@@ -291,13 +350,8 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		priceRequested,
 	} = req.body;
 
-	if (
-		!productOfferedId ||
-		!productRequestedId ||
-		!isValidObjectId(productOfferedId) ||
-		!isValidObjectId(productRequestedId)
-	) {
-		throw new ApiError(400, "Invalid or missing product(s) ID");
+	if (!productOfferedId || !isValidObjectId(productOfferedId)) {
+		throw new ApiError(400, "Invalid or missing product offered ID");
 	}
 
 	const { error } = validateTransaction({
@@ -312,35 +366,48 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 	}
 
-	const productOffered = await Product.findById(productOfferedId);
-	if (!productOffered) {
-		throw new ApiError(404, "ID of product put up for bartering not found");
+	if (
+		(transactionType === "barter" || transactionType === "hybrid") &&
+		(!productRequestedId || !isValidObjectId(productRequestedId))
+	) {
+		throw new ApiError(400, "Invalid or missing product requested ID");
 	}
 
-	const productRequested = await Product.findById(productRequestedId);
-	if (!productRequested) {
-		throw new ApiError(
-			404,
-			"ID of product requested for bartering not found"
-		);
+	const productOffered = await Product.findById(productOfferedId);
+	if (!productOffered) {
+		throw new ApiError(404, "Offered product not found");
+	}
+
+	let productRequested;
+	if (productRequestedId) {
+		productRequested = await Product.findById(productRequestedId);
+		if (!productRequested) {
+			throw new ApiError(404, "Requested product not found");
+		}
+		if (productRequested.owner.toString() === req.user._id.toString()) {
+			throw new ApiError(
+				403,
+				"Cannot initiate transaction with own product."
+			);
+		}
 	}
 
 	if (productOffered.owner.toString() !== req.user._id.toString()) {
-		throw new ApiError(403, "Access Forbidden.");
-	}
-	if (productRequested.owner.toString() === req.user?._id.toString()) {
-		throw new ApiError(403, "Access Forbidden.");
+		throw new ApiError(
+			403,
+			"User is not the owner of the offered product."
+		);
 	}
 
 	const existingTransaction = await Transaction.findOne({
 		productOffered: productOfferedId,
-		productRequested: productRequestedId,
+		orderStatus: { $ne: "cancel" },
 	});
 
 	if (existingTransaction) {
 		throw new ApiError(
 			409,
-			"A transaction between these products already exists."
+			"An active transaction involving offered already exists."
 		);
 	}
 
@@ -348,11 +415,29 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		transactionType,
 		productOffered: productOfferedId,
 		productRequested: productRequestedId,
-		priceOffered,
-		priceRequested,
+		priceOffered:
+			transactionType === "sale" || transactionType === "hybrid"
+				? priceOffered
+				: undefined,
+		priceRequested:
+			transactionType === "sale" || transactionType === "hybrid"
+				? priceRequested
+				: undefined,
 		initiator: req.user._id,
-		recipient: productRequested.owner,
+		recipient: productRequested?.owner,
 	});
+
+	if (
+		transaction &&
+		(transactionType === "barter" || transactionType === "hybrid")
+	) {
+		await Notification.create({
+			transactionId: transaction.insertedId,
+			notificationType: "transaction",
+			content: "A transaction was initiated",
+			user: productRequested.owner,
+		});
+	}
 
 	return res
 		.status(200)
@@ -366,15 +451,27 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 });
 
 const updateTransaction = asyncHandler(async (req, res) => {
-	const { orderStatus } = req.body;
+	const { priceOffered, priceRequested, orderStatus } = req.body;
 	const { transactionId } = req.params;
 
 	if (!transactionId || !isValidObjectId(transactionId)) {
 		throw new ApiError(400, "Invalid or missing transaction ID");
 	}
 
-	if (!(orderStatus === "accepted" || orderStatus === "cancelled")) {
-		throw new ApiError(400, "Entered an incorrect order status value");
+	const { error } = validateTransaction({
+		priceOffered,
+		priceRequested,
+		orderStatus,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
+	}
+
+	if ((priceOffered || priceRequested) && orderStatus !== "counter") {
+		throw new ApiError(403, "Access forbidden.");
 	}
 
 	const transaction = await Transaction.findById(transactionId);
@@ -382,8 +479,24 @@ const updateTransaction = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Transaction not found");
 	}
 
+	if (orderStatus === "accept" || orderStatus === "complete") {
+		if (transaction.recipient.toString() !== req.user._id.toString()) {
+			throw new ApiError(403, "Access forbidden.");
+		}
+	}
+
 	await Transaction.findByIdAndUpdate(transactionId, {
 		$set: {
+			priceOffered:
+				transaction.transactionType === "sale" ||
+				transaction.transactionType === "hybrid"
+					? priceOffered
+					: 0,
+			priceRequested:
+				transaction.transactionType === "sale" ||
+				transaction.transactionType === "hybrid"
+					? priceRequested
+					: 0,
 			orderStatus,
 		},
 	});
@@ -402,9 +515,9 @@ export {
 };
 
 /*
-get all user as initiator transactions
-get all user as recipient transactions
-get transaction details (id)
-initiate transaction (2 product ids) ✔️
-update transaction status [id]
+get all user as initiator transactions ✔️
+get all user as recipient transactions ✔️
+get transaction details
+initiate transaction - send notification ✔️
+update transaction status - send notification
 */
