@@ -430,6 +430,23 @@ const deleteProduct = asyncHandler(async (req, res) => {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
+	const transactions = await Transaction.aggregate([
+		{
+			$match: {
+				productOffered: productId,
+				orderStatus: {
+					$ne: "cancelled",
+				},
+			},
+		},
+	]);
+	if (transactions.length) {
+		throw new ApiError(
+			403,
+			"Access forbidden. Product active in transaction"
+		);
+	}
+
 	if (product.image?.id) {
 		await deleteFromCloudinary(product.image?.id);
 	}
@@ -441,14 +458,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 		},
 	});
 	await Transaction.deleteMany({
-		$or: [
-			{
-				productOffered: productId,
-			},
-			{
-				productRequested: productId,
-			},
-		],
+		productOffered: productId,
 	});
 	await Notification.deleteMany({ productId });
 

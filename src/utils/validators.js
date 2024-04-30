@@ -50,7 +50,12 @@ const feedbackSchema = Joi.object({
 }).or("content", "rating");
 
 const notificationSchema = Joi.object({
-	notificationType: Joi.string(),
+	notificationType: Joi.string().valid(
+		"feedback",
+		"product",
+		"transaction",
+		"follow"
+	),
 	content: Joi.string().trim().min(5).max(50),
 	isRead: Joi.boolean(),
 });

@@ -15,6 +15,10 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
+				productId: 1,
+				feedbackId: 1,
+				followedById: 1,
+				transactionId: 1,
 				notificationType: 1,
 				content: 1,
 				isRead: 1,
@@ -34,7 +38,7 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 		);
 });
 
-const markNotificationAsRead = asyncHandler(async (req, res) => {
+const toggleNotificationStatus = asyncHandler(async (req, res) => {
 	const { notificationId } = req.params;
 	if (!notificationId || !isValidObjectId(notificationId)) {
 		throw new ApiError(400, "Invalid or missing notification ID");
@@ -79,10 +83,14 @@ const deleteNotification = asyncHandler(async (req, res) => {
 		.json(new ApiResponse(200, {}, "Notification deleted successfully"));
 });
 
-export { getAllUserNotifications, markNotificationAsRead, deleteNotification };
+export {
+	getAllUserNotifications,
+	toggleNotificationStatus,
+	deleteNotification,
+};
 
 /*
 get all user notifications
-mark notification as read ✔️
+toggle notification status ✔️
 delete notification ✔️
 */
