@@ -192,15 +192,7 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing transaction ID");
 	}
 
-	const transaction = await Transaction.findById(transactionId);
-	if (!transaction) {
-		throw new ApiError(404, "Transaction not found");
-	}
-
-	const isInitiator =
-		transaction.initiatedBy?.toString() === req.user?._id?.toString();
-
-	const getTransaction = await Transaction.aggregate([
+	const transaction = await Transaction.aggregate([
 		{
 			$match: {
 				_id: new mongoose.Types.ObjectId(transactionId),
@@ -225,6 +217,8 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 							image: 1,
 							condition: 1,
 							category: 1,
+							isBarter: 1,
+							price: 1,
 							createdAt: 1,
 						},
 					},
@@ -250,6 +244,8 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 							image: 1,
 							condition: 1,
 							category: 1,
+							isBarter: 1,
+							price: 1,
 							createdAt: 1,
 						},
 					},
@@ -259,9 +255,9 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		{
 			$lookup: {
 				from: "users",
-				localField: "initiatedBy",
+				localField: "initiator",
 				foreignField: "_id",
-				as: "initiatedUser",
+				as: "initiator",
 				pipeline: [
 					{
 						$addFields: {
@@ -282,7 +278,7 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "recipient",
 				foreignField: "_id",
-				as: "recipientUser",
+				as: "recipient",
 				pipeline: [
 					{
 						$addFields: {
@@ -306,28 +302,30 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 				productRequest: {
 					$first: "$productRequest",
 				},
-				initiatedUser: {
-					$first: "$initiatedUser",
+				initiator: {
+					$first: "$initiator",
 				},
-				recipientUser: {
-					$first: "$recipientUser",
+				recipient: {
+					$first: "$recipient",
 				},
 			},
 		},
 		{
 			$project: {
+				transactionType: 1,
 				productOffer: 1,
 				productRequest: 1,
+				priceOffered: 1,
+				priceRequested: 1,
 				orderStatus: 1,
-				remarks: 1,
-				initiatedUser: 1,
-				recipientUser: 1,
+				initiator: 1,
+				recipient: 1,
 			},
 		},
 	]);
 
-	if (getTransaction.length > 0) {
-		getTransaction[0].isInitiator = isInitiator;
+	if (!transaction.length) {
+		throw new ApiError(404, "Transaction not found");
 	}
 
 	return res
@@ -335,7 +333,7 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				getTransaction,
+				transaction,
 				"Transaction retrieved successfully"
 			)
 		);
@@ -517,7 +515,9 @@ export {
 /*
 get all user as initiator transactions ✔️
 get all user as recipient transactions ✔️
-get transaction details
+get transaction details ✔️
 initiate transaction - send notification ✔️
 update transaction status - send notification
+
+// if any product is not available, change status of transaction and return
 */
