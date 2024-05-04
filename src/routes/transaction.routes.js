@@ -7,24 +7,23 @@ import {
 	updateTransaction,
 } from "../controllers/transaction.controller.js";
 import verifyJWT from "../middlewares/auth.middleware.js";
+import checkVerificationAndBan from "../middlewares/checkVerificationAndBan.middleware.js";
 
 const router = Router();
 
 //secured routes
 router
 	.route("/user/initiator")
-	.get(verifyJWT, getAllUserAsInitiatorTransactions);
+	.get(verifyJWT, checkVerificationAndBan, getAllUserAsInitiatorTransactions);
 router
 	.route("/user/recipient")
-	.get(verifyJWT, getAllUserAsRecipientTransactions);
+	.get(verifyJWT, checkVerificationAndBan, getAllUserAsRecipientTransactions);
 router
 	.route("/:transactionId")
-	.get(verifyJWT, getTransactionDetails);
+	.get(verifyJWT, checkVerificationAndBan, getTransactionDetails)
+	.patch(verifyJWT, checkVerificationAndBan, updateTransaction);
 router
-	.route("/transaction/add/:productRequestedId")
-	.post(verifyJWT, initiateTransaction);
-router
-	.route("/transaction/update/:transactionId")
-	.patch(verifyJWT, updateTransaction);
+	.route("/add")
+	.post(verifyJWT, checkVerificationAndBan, initiateTransaction);
 
 export default router;

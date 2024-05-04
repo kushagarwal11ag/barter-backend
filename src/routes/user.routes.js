@@ -8,6 +8,7 @@ import {
 	updateUserDetails,
 	updateUserFiles,
 	logoutUser,
+	deleteAccount,
 	refreshAccessToken,
 } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
@@ -22,10 +23,10 @@ router.route("/refresh").post(refreshAccessToken);
 
 // secured routes
 router
-	.route("/me/password")
+	.route("/password")
 	.patch(verifyJWT, checkVerificationAndBan, changeCurrentPassword);
 router
-	.route("/me")
+	.route("/")
 	.get(verifyJWT, checkVerificationAndBan, getCurrentUser)
 	.put(verifyJWT, checkVerificationAndBan, updateUserDetails)
 	.patch(
@@ -36,7 +37,8 @@ router
 			{ name: "banner", maxCount: 1 },
 		]),
 		updateUserFiles
-	);
+	)
+	.delete(verifyJWT, checkVerificationAndBan, deleteAccount);
 router.route("/:userId").get(verifyJWT, checkVerificationAndBan, getUserById);
 router.route("/logout").post(verifyJWT, checkVerificationAndBan, logoutUser);
 

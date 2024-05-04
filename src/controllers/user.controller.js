@@ -86,9 +86,7 @@ const loginUser = asyncHandler(async (req, res) => {
 		);
 	}
 
-	const user = await User.findOne({ email }).select(
-		"-password -displayEmail -displayPhone -isVerified -isBanned -refreshToken"
-	);
+	const user = await User.findOne({ email });
 	if (!user) {
 		throw new ApiError(404, "User not found");
 	}
@@ -102,6 +100,14 @@ const loginUser = asyncHandler(async (req, res) => {
 		user._id
 	);
 
+	const loggedInUser = user.toObject();
+	delete loggedInUser.password;
+	delete loggedInUser.displayEmail;
+	delete loggedInUser.displayPhone;
+	delete loggedInUser.isVerified;
+	delete loggedInUser.isBanned;
+	delete loggedInUser.refreshToken;
+
 	return res
 		.status(200)
 		.cookie("accessToken", accessToken, options)
@@ -110,7 +116,7 @@ const loginUser = asyncHandler(async (req, res) => {
 			new ApiResponse(
 				200,
 				{
-					user,
+					loggedInUser,
 					accessToken,
 					refreshToken,
 				},
@@ -136,7 +142,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "New password cannot be same as the old one");
 	}
 
-	const user = req.user;
+	const user = await User.findById(req.user._id);
 	const isPasswordValid = await user.isPasswordCorrect(oldPassword);
 	if (!isPasswordValid) {
 		throw new ApiError(400, "The old password is incorrect");
@@ -151,12 +157,15 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
+	const currentUser = req.user.toObject();
+	delete currentUser.isVerified;
+	delete currentUser.isBanned;
 	return res
 		.status(200)
 		.json(
 			new ApiResponse(
 				200,
-				req.user,
+				currentUser,
 				"Current user retrieved successfully"
 			)
 		);

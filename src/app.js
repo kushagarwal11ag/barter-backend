@@ -27,6 +27,9 @@ import productRouter from "./routes/product.routes.js";
 import transactionRouter from "./routes/transaction.routes.js";
 import wishlistRouter from "./routes/wishlist.routes.js";
 import blockUserRouter from "./routes/blockUser.routes.js";
+import feedbackRouter from "./routes/feedback.routes.js";
+import followRouter from "./routes/follower.routes.js";
+import notificationRouter from "./routes/notification.routes.js";
 
 //routes declaration
 app.use("/api/v1/health-check", healthCheckRouter);
@@ -35,6 +38,9 @@ app.use("/api/v1/products", productRouter);
 app.use("/api/v1/transactions", transactionRouter);
 app.use("/api/v1/wishlist", wishlistRouter);
 app.use("/api/v1/block", blockUserRouter);
+app.use("/api/v1/feedback", feedbackRouter);
+app.use("/api/v1/follow", followRouter);
+app.use("/api/v1/notification", notificationRouter);
 
 app.use((err, req, res, next) => {
 	if (err instanceof ApiError) {
