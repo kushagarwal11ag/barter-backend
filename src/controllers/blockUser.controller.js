@@ -46,7 +46,7 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 			new ApiResponse(
 				200,
 				blockedUsers?.[0],
-				"Blocked user retrieved successfully"
+				"Blocked users retrieved successfully"
 			)
 		);
 });
@@ -87,6 +87,10 @@ const unblockUser = asyncHandler(async (req, res) => {
 			400,
 			"Invalid or missing user ID of the blocked user"
 		);
+	}
+
+	if (req.user._id.toString() === userId) {
+		throw new ApiError(400, "Cannot unblock oneself.");
 	}
 
 	await User.findByIdAndUpdate(req.user._id, {

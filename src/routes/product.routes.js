@@ -17,11 +17,11 @@ const router = Router();
 router.route("/all").get(verifyJWT, checkVerificationAndBan, getAllProducts);
 router.route("/my").get(verifyJWT, checkVerificationAndBan, getUserProducts);
 router
-	.route("/product")
+	.route("/")
 	.post(
 		verifyJWT,
 		checkVerificationAndBan,
-		upload.array("images", 5),
+		upload.single("image"),
 		createProduct
 	);
 router
@@ -30,7 +30,7 @@ router
 	.patch(
 		verifyJWT,
 		checkVerificationAndBan,
-		upload.array("images", 5),
+		upload.single("image"),
 		updateProduct
 	)
 	.delete(verifyJWT, checkVerificationAndBan, deleteProduct);

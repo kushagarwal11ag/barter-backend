@@ -116,7 +116,7 @@ const loginUser = asyncHandler(async (req, res) => {
 			new ApiResponse(
 				200,
 				{
-					loggedInUser,
+					user: loggedInUser,
 					accessToken,
 					refreshToken,
 				},
@@ -178,8 +178,6 @@ const getUserById = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
 
-	const loggedInUserId = req.user?._id;
-
 	const user = await User.aggregate([
 		{
 			$match: {
@@ -198,13 +196,6 @@ const getUserById = asyncHandler(async (req, res) => {
 							isAvailable: true,
 						},
 					},
-					{
-						$project: {
-							title: 1,
-							image: 1,
-							category: 1,
-						},
-					},
 				],
 			},
 		},
@@ -213,7 +204,17 @@ const getUserById = asyncHandler(async (req, res) => {
 				avatar: "$avatar.url",
 				banner: "$banner.url",
 				isBlocked: {
-					$in: [loggedInUserId, "$blockedUsers"],
+					$or: [
+						{
+							$in: [
+								new mongoose.Types.ObjectId(req.user._id),
+								"$blockedUsers",
+							],
+						}, // if logged-in user is blocked by this user
+						{
+							$in: ["$_id", req.user.blockedUsers],
+						}, // if this user is blocked by logged-in user
+					],
 				},
 			},
 		},
@@ -238,7 +239,13 @@ const getUserById = asyncHandler(async (req, res) => {
 				avatar: 1,
 				banner: 1,
 				rating: 1,
-				product: 1,
+				isBanned: 1,
+				isBlocked: 1,
+				product: {
+					title: 1,
+					image: 1,
+					category: 1,
+				},
 			},
 		},
 	]);
@@ -247,14 +254,15 @@ const getUserById = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "User not found");
 	}
 
-	if (user?.[0]?.isBlocked) {
-		throw new ApiError(403, "Access denied. You are blocked by this user.");
+	if (user[0]?.isBlocked || user[0]?.isBanned) {
+		throw new ApiError(403, "Access denied.");
 	}
-	delete user?.[0]?.isBlocked;
+	delete user[0]?.isBlocked;
+	delete user[0]?.isBanned;
 
 	return res
 		.status(200)
-		.json(new ApiResponse(200, user?.[0], "User retrieved successfully"));
+		.json(new ApiResponse(200, user[0], "User retrieved successfully"));
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {
@@ -307,7 +315,7 @@ const updateUserFiles = asyncHandler(async (req, res) => {
 		};
 	}
 	if (bannerLocalPath) {
-		const banner = await handleFileUpload(bannerLocalPath, "govId");
+		const banner = await handleFileUpload(bannerLocalPath, "banner");
 		uploadObject.banner = {
 			id: banner.id,
 			url: banner.url,

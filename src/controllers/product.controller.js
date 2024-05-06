@@ -13,50 +13,36 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
 const getAllProducts = asyncHandler(async (req, res) => {
-	const blockedUsers =
-		req.user.blockedUsers?.map((id) => id.toString()) || [];
-
+	const blocked = req.user.blockedUsers;
 	const products = await Product.aggregate([
+		{
+			$match: {
+				isAvailable: true,
+				owner: { $nin: blocked }, // Exclude products if product owner is blocked
+			},
+		},
 		{
 			$lookup: {
 				from: "users",
 				localField: "owner",
 				foreignField: "_id",
 				as: "ownerDetails",
-				pipeline: [
-					{
-						$match: {
-							$expr: {
-								$and: [
-									{ $not: [{ $in: ["$_id", blockedUsers] }] }, // Ensure the owner is not in the blockedUsers list
-									{ $eq: ["$isBanned", false] }, // Ensure the owner is not banned
-								],
-							},
-						},
-					},
-					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
-						$project: {
-							name: 1,
-							avatar: 1,
-						},
-					},
-				],
 			},
 		},
 		{
+			$unwind: "$ownerDetails",
+		},
+		{
 			$match: {
-				isAvailable: true,
-				"ownerDetails.0": { $exists: true }, // Ensure there is at least one non-blocked, non-banned owner
+				"ownerDetails.isBanned": { $ne: true }, // Exclude products where the owner is banned
+				"ownerDetails.blockedUsers": {
+					$ne: new mongoose.Types.ObjectId(req.user._id),
+				}, // Exclude products where the owner has blocked the logged-in user
 			},
 		},
 		{
 			$addFields: {
-				owner: { $arrayElemAt: ["$ownerDetails", 0] }, // Flatten the owner details
+				owner: "$ownerDetails",
 				image: "$image.url",
 			},
 		},
@@ -70,7 +56,12 @@ const getAllProducts = asyncHandler(async (req, res) => {
 				title: 1,
 				image: 1,
 				category: 1,
-				owner: 1,
+				isBarter: 1,
+				price: 1,
+				owner: {
+					name: 1,
+					avatar: "$owner.avatar.url",
+				},
 			},
 		},
 	]);
@@ -108,6 +99,9 @@ const getUserProducts = asyncHandler(async (req, res) => {
 				title: 1,
 				image: 1,
 				category: 1,
+				isBarter: 1,
+				price: 1,
+				isAvailable: 1,
 			},
 		},
 	]);
@@ -125,27 +119,14 @@ const getUserProducts = asyncHandler(async (req, res) => {
 
 const getProductById = asyncHandler(async (req, res) => {
 	const { productId } = req.params;
+	const userId = req.user._id;
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
-
-	const product = await Product.findByIdAndUpdate(productId, {
-		$addToSet: {
-			view: req.user._id,
-		},
-	});
-	if (!product) {
-		throw new ApiError(404, "Product not found");
-	}
-
-	const blockedUsers =
-		req.user.blockedUsers?.map((id) => id.toString()) || [];
-
-	const getProduct = await Product.aggregate([
+	const product = await Product.aggregate([
 		{
 			$match: {
 				_id: new mongoose.Types.ObjectId(productId),
-				isAvailable: true,
 			},
 		},
 		{
@@ -153,18 +134,8 @@ const getProductById = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "owner",
 				foreignField: "_id",
-				as: "ownerDetails",
+				as: "owner",
 				pipeline: [
-					{
-						$match: {
-							$expr: {
-								$and: [
-									{ $not: [{ $in: ["$_id", blockedUsers] }] },
-									{ $eq: ["$isBanned", false] },
-								],
-							},
-						},
-					},
 					{
 						$addFields: {
 							avatar: "$avatar.url",
@@ -174,19 +145,18 @@ const getProductById = asyncHandler(async (req, res) => {
 						$project: {
 							name: 1,
 							avatar: 1,
+							blockedUsers: 1,
+							isBanned: 1,
 						},
 					},
 				],
 			},
 		},
 		{
-			$match: {
-				"ownerDetails.0": { $exists: true },
-			},
-		},
-		{
 			$addFields: {
-				owner: { $arrayElemAt: ["$ownerDetails", 0] },
+				owner: {
+					$first: "$owner",
+				},
 				image: "$image.url",
 				viewCount: {
 					$size: "$views",
@@ -195,25 +165,48 @@ const getProductById = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				title: 1,
-				description: 1,
-				image: 1,
-				condition: 1,
-				category: 1,
-				isBarter: 1,
-				barterCategory: 1,
-				barterDescription: 1,
-				price: 1,
-				viewCount: 1,
-				meetingSpot: 1,
-				owner: 1,
+				_id: 0,
+				views: 0,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
 
 	if (!product.length) {
-		throw new ApiError(404, "Product not found or Access denied");
+		throw new ApiError(404, "Product not found");
 	}
+
+	if (
+		product[0].owner.isBanned ||
+		(userId.toString() !== product[0].owner._id.toString() &&
+			!product[0].isAvailable)
+	)
+		throw new ApiError(403, "Access forbidden.");
+
+	const blocked = product[0].owner.blockedUsers?.map((id) => id.toString());
+	blocked.map((blockedUser) => {
+		if (userId.toString() === blockedUser)
+			throw new ApiError(403, "Access forbidden.");
+	});
+
+	const blockedUser = req.user.blockedUsers?.map((id) => id.toString());
+	blockedUser.map((blockedUser) => {
+		if (product[0].owner._id.toString() === blockedUser)
+			throw new ApiError(
+				403,
+				"You have blocked this user. Unblock to continue"
+			);
+	});
+
+	const getProduct = {
+		...product[0],
+		owner: {
+			_id: product[0].owner._id,
+			name: product[0].owner.name,
+			avatar: product[0].owner.avatar,
+		},
+	};
 
 	return res
 		.status(200)
@@ -350,7 +343,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
-	if (product.isBarter) {
+	if (product.isBarter && (barterCategory || barterDescription)) {
 		const { error } = validateProduct({
 			barterCategory,
 			barterDescription,
@@ -359,9 +352,9 @@ const updateProduct = asyncHandler(async (req, res) => {
 			throw new ApiError(
 				400,
 				`Validation error: ${error.details[0].message}`
-			);
+				);
+			}
 		}
-	}
 
 	if (price) {
 		const { error } = validateProduct({
@@ -385,7 +378,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 			);
 		}
 
-		if (product.image.id) {
+		if (product.image?.id) {
 			await deleteFromCloudinary(product.image.id);
 		}
 	}
@@ -397,7 +390,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 				description,
 				barterCategory: product.isBarter ? barterCategory : null,
 				barterDescription: product.isBarter ? barterDescription : null,
-				price: price >= 0 ? price : product.price,
+				price,
 				meetingSpot,
 				isAvailable,
 				image: {
