@@ -6,7 +6,8 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
 const getUserWishlist = asyncHandler(async (req, res) => {
-	const userId = req.user?._id;
+	const blocked = req.user.blockedUsers;
+	const userId = req.user._id;
 	const wishlist = await User.aggregate([
 		{
 			$match: {
@@ -23,6 +24,12 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 					{
 						$match: {
 							isAvailable: true,
+							owner: { $nin: blocked },
+						},
+					},
+					{
+						$addFields: {
+							image: "$image.url",
 						},
 					},
 					{
@@ -35,9 +42,14 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 								{
 									$match: {
 										blockedUsers: {
-											$ne: new mongoose.Types.ObjectId(
-												userId
-											),
+											$nin: [
+												new mongoose.Types.ObjectId(
+													userId
+												),
+											],
+										},
+										isBanned: {
+											$ne: true,
 										},
 									},
 								},
@@ -56,17 +68,11 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 						},
 					},
 					{
-						$unwind: {
-							path: "$ownerDetails",
-							preserveNullAndEmptyArrays: false,
-						},
-					},
-					{
 						$project: {
 							title: 1,
-							images: 1,
+							image: 1,
 							category: 1,
-							owner: { $arrayElemAt: ["$ownerDetails", 0] },
+							owner: { $ifNull: ["$ownerDetails", null] },
 						},
 					},
 				],
@@ -74,6 +80,7 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
+				_id: 0,
 				products: 1,
 			},
 		},
@@ -84,7 +91,7 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				wishlist,
+				wishlist?.[0],
 				"User wishlist retrieved successfully"
 			)
 		);
@@ -97,16 +104,27 @@ const addToWishlist = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
 
-	const product = await Product.findById(productId).populate(
-		"owner",
-		"blockedUsers"
-	);
+	const product = await Product.findById(productId).populate({
+		path: "owner",
+		select: "_id, blockedUsers, isBanned",
+	});
 	if (!product) {
 		throw new ApiError(404, "Product not found");
 	}
 
-	if (product.owner.blockedUsers?.includes(req.user._id.toString())) {
-		throw new ApiError(403, "Access Forbidden. Blocked by user");
+	if (product.owner._id.toString() === req.user._id.toString()) {
+		throw new ApiError(
+			403,
+			"Access denied. Cannot wishlist your own product"
+		);
+	}
+
+	if (
+		product.owner.blockedUsers?.includes(req.user._id.toString()) ||
+		req.user.blockedUsers?.includes(product.owner._id.toString()) ||
+		product.owner.isBanned
+	) {
+		throw new ApiError(403, "Access Forbidden.");
 	}
 
 	await User.findByIdAndUpdate(req.user?._id, {
