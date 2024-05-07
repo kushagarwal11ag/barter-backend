@@ -20,10 +20,12 @@ const feedbackSchema = new Schema(
 		feedbackFor: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
+			index: true,
 		},
 		feedbackBy: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
+			index: true,
 		},
 	},
 	{ timestamps: true }

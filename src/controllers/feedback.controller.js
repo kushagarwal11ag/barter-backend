@@ -12,6 +12,20 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 	if (!userId || !isValidObjectId(userId)) {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
+
+	const user = await User.findById(userId);
+	if (!user) {
+		throw new ApiError(404, "User not found");
+	}
+
+	if (
+		user.isBanned ||
+		req.user.blockedUsers?.includes(userId) ||
+		user.blockedUsers?.includes(req.user._id)
+	) {
+		throw new ApiError(403, "Access denied");
+	}
+
 	const feedbacks = await Feedback.aggregate([
 		{
 			$match: {
@@ -35,6 +49,28 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 							_id: 1,
 							name: 1,
 							avatar: 1,
+							blockedUsers: 1,
+						},
+					},
+				],
+			},
+		},
+		{
+			$unwind: "$feedbackBy",
+		},
+		{
+			$match: {
+				$nor: [
+					{
+						"feedbackBy.blockedUsers": new mongoose.Types.ObjectId(
+							req.user._id
+						),
+					},
+					{
+						"feedbackBy._id": {
+							$in: req.user.blockedUsers?.map(
+								(id) => new mongoose.Types.ObjectId(id)
+							),
 						},
 					},
 				],
@@ -42,10 +78,13 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				_id: 0,
 				content: 1,
 				rating: 1,
-				feedbackBy: 1,
+				feedbackBy: {
+					_id: 1,
+					name: 1,
+					avatar: 1,
+				},
 			},
 		},
 	]);
@@ -85,6 +124,28 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 							_id: 1,
 							name: 1,
 							avatar: 1,
+							blockedUsers: 1,
+						},
+					},
+				],
+			},
+		},
+		{
+			$unwind: "$feedbackFor",
+		},
+		{
+			$match: {
+				$nor: [
+					{
+						"feedbackFor.blockedUsers": new mongoose.Types.ObjectId(
+							req.user._id
+						),
+					},
+					{
+						"feedbackFor._id": {
+							$in: req.user.blockedUsers?.map(
+								(id) => new mongoose.Types.ObjectId(id)
+							),
 						},
 					},
 				],
@@ -92,10 +153,13 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				_id: 0,
 				content: 1,
 				rating: 1,
-				feedbackFor: 1,
+				feedbackFor: {
+					_id: 1,
+					name: 1,
+					avatar: 1,
+				},
 			},
 		},
 	]);
@@ -135,7 +199,26 @@ const createFeedback = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Cannot post feedback as user not found");
 	}
 
-	const feedback = await Feedback.insertOne({
+	if (
+		user.isBanned ||
+		user.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(userId)
+	) {
+		throw new ApiError(403, "Access denied.");
+	}
+
+	const feedbackExists = await Feedback.findOne({
+		feedbackFor: userId,
+		feedbackBy: req.user._id,
+	});
+	if (feedbackExists) {
+		throw new ApiError(
+			403,
+			"Access denied. Cannot post multiple feedbacks."
+		);
+	}
+
+	const feedback = await Feedback.create({
 		content,
 		rating,
 		feedbackFor: userId,
@@ -143,7 +226,7 @@ const createFeedback = asyncHandler(async (req, res) => {
 	});
 
 	await Notification.create({
-		feedbackId: feedback.insertedId,
+		feedbackId: feedback._id,
 		notificationType: "feedback",
 		content: "You received a feedback",
 		user: userId,
@@ -170,31 +253,29 @@ const updateFeedback = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing feedback ID");
 	}
 
-	const feedback = await Feedback.findById(feedbackId);
+	const feedback = await Feedback.findById(feedbackId).populate({
+		path: "feedbackFor",
+		select: "_id, isBanned, blockedUsers",
+	});
 	if (!feedback) {
 		throw new ApiError(404, "Feedback not found");
 	}
-	if (feedback.feedbackBy.toString() !== req.user._id.toString()) {
+	if (
+		feedback.feedbackBy.toString() !== req.user._id.toString() ||
+		feedback.feedbackFor.isBanned ||
+		feedback.feedbackFor.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(feedback.feedbackFor._id)
+	) {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
-	const updatedFeedback = await Feedback.findByIdAndUpdate(
-		feedbackId,
-		{
-			$set: { content, rating },
-		},
-		{ new: true }
-	);
+	await Feedback.findByIdAndUpdate(feedbackId, {
+		$set: { content, rating },
+	});
 
 	return res
 		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				updatedFeedback,
-				"Feedback posted successfully"
-			)
-		);
+		.json(new ApiResponse(200, {}, "Feedback updated successfully"));
 });
 
 const deleteFeedback = asyncHandler(async (req, res) => {

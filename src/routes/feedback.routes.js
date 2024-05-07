@@ -13,7 +13,7 @@ const router = Router();
 
 // secured routes
 router
-	.route("/")
+	.route("/user/:userId")
 	.get(verifyJWT, checkVerificationAndBan, getAllUserFeedbacks)
 	.post(verifyJWT, checkVerificationAndBan, createFeedback);
 router.route("/my").get(verifyJWT, checkVerificationAndBan, getAllMyFeedbacks);
