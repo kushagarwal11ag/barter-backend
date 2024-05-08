@@ -340,6 +340,7 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 });
 
 const initiateTransaction = asyncHandler(async (req, res) => {
+	// prevent if user banned/blocked
 	const {
 		transactionType,
 		productOfferedId,
@@ -348,8 +349,18 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		priceRequested,
 	} = req.body;
 
-	if (!productOfferedId || !isValidObjectId(productOfferedId)) {
-		throw new ApiError(400, "Invalid or missing product offered ID");
+	if (!productRequestedId || !isValidObjectId(productRequestedId)) {
+		throw new ApiError(400, "Invalid or missing product requested ID");
+	}
+	const productRequested = await Product.findById(productRequestedId);
+	if (!productRequested) {
+		throw new ApiError(404, "Requested product not found");
+	}
+	if (productRequested.owner.toString() === req.user._id.toString()) {
+		throw new ApiError(
+			403,
+			"Cannot initiate transaction with own product."
+		);
 	}
 
 	const { error } = validateTransaction({
@@ -364,78 +375,72 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 	}
 
-	if (
-		(transactionType === "barter" || transactionType === "hybrid") &&
-		(!productRequestedId || !isValidObjectId(productRequestedId))
-	) {
-		throw new ApiError(400, "Invalid or missing product requested ID");
-	}
+	const isBarter = transactionType === "barter";
+	const isSale = transactionType === "sale";
+	const isHybrid = transactionType === "hybrid";
+	let newPriceOffered = priceOffered;
+	let newPriceRequested = priceRequested;
 
-	const productOffered = await Product.findById(productOfferedId);
-	if (!productOffered) {
-		throw new ApiError(404, "Offered product not found");
+	if (isSale && newPriceOffered === 0) {
+		throw new ApiError(400, "No amount provided for sale");
 	}
-
-	let productRequested;
-	if (productRequestedId) {
-		productRequested = await Product.findById(productRequestedId);
-		if (!productRequested) {
-			throw new ApiError(404, "Requested product not found");
-		}
-		if (productRequested.owner.toString() === req.user._id.toString()) {
-			throw new ApiError(
-				403,
-				"Cannot initiate transaction with own product."
-			);
+	if (isHybrid && newPriceOffered > 0 && newPriceRequested > 0) {
+		if (newPriceOffered > newPriceRequested) {
+			newPriceOffered = newPriceOffered - newPriceRequested;
+			newPriceRequested = 0;
+		} else if (newPriceOffered < newPriceRequested) {
+			newPriceRequested = newPriceRequested - newPriceOffered;
+			newPriceOffered = 0;
+		} else {
+			newPriceOffered = newPriceRequested = 0;
 		}
 	}
 
-	if (productOffered.owner.toString() !== req.user._id.toString()) {
-		throw new ApiError(
-			403,
-			"User is not the owner of the offered product."
-		);
+	let productOffered, existingTransaction;
+	if (isBarter || isHybrid) {
+		if (!productOfferedId || !isValidObjectId(productOfferedId)) {
+			throw new ApiError(400, "Invalid or missing product offered ID");
+		}
+		productOffered = await Product.findById(productOfferedId);
+		if (!productOffered) {
+			throw new ApiError(404, "Offered product not found");
+		}
+		if (productOffered.owner.toString() !== req.user._id.toString()) {
+			throw new ApiError(403, "Access forbidden");
+		}
+
+		existingTransaction = await Transaction.findOne({
+			productOffered: productOfferedId,
+			orderStatus: { $ne: "cancel" },
+		});
 	}
 
-	const existingTransaction = await Transaction.findOne({
-		productOffered: productOfferedId,
-		orderStatus: { $ne: "cancel" },
-	});
-
+	if (!existingTransaction && isSale) {
+		existingTransaction = await Transaction.findOne({
+			productRequested: productRequestedId,
+			initiator: req.user._id,
+		});
+	}
 	if (existingTransaction) {
-		throw new ApiError(
-			409,
-			"An active transaction involving offered already exists."
-		);
+		throw new ApiError(409, "Transaction initiation conflict.");
 	}
 
 	const transaction = await Transaction.create({
 		transactionType,
-		productOffered: productOfferedId,
+		productOffered: isBarter || isHybrid ? productOfferedId : undefined,
 		productRequested: productRequestedId,
-		priceOffered:
-			transactionType === "sale" || transactionType === "hybrid"
-				? priceOffered
-				: undefined,
-		priceRequested:
-			transactionType === "sale" || transactionType === "hybrid"
-				? priceRequested
-				: undefined,
+		priceOffered: isSale || isHybrid ? newPriceOffered : undefined,
+		priceRequested: isHybrid ? newPriceRequested : undefined,
 		initiator: req.user._id,
 		recipient: productRequested?.owner,
 	});
 
-	if (
-		transaction &&
-		(transactionType === "barter" || transactionType === "hybrid")
-	) {
-		await Notification.create({
-			transactionId: transaction.insertedId,
-			notificationType: "transaction",
-			content: "A transaction was initiated",
-			user: productRequested.owner,
-		});
-	}
+	await Notification.create({
+		transactionId: transaction._id,
+		notificationType: "transaction",
+		content: "Transaction requested",
+		user: productRequested.owner,
+	});
 
 	return res
 		.status(200)

@@ -13,14 +13,10 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				productId: 1,
-				feedbackId: 1,
-				followedById: 1,
-				transactionId: 1,
-				notificationType: 1,
-				content: 1,
-				isRead: 1,
-				user: 1,
+				user: 0,
+				createdAt: 0,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
@@ -46,6 +42,9 @@ const toggleNotificationStatus = asyncHandler(async (req, res) => {
 	if (!notification) {
 		throw new ApiError(404, "Notification not found");
 	}
+	if (notification.user.toString() !== req.user._id.toString()) {
+		throw new ApiError(403, "Access forbidden.");
+	}
 
 	await Notification.findByIdAndUpdate(
 		notificationId,
@@ -56,7 +55,7 @@ const toggleNotificationStatus = asyncHandler(async (req, res) => {
 	return res
 		.status(200)
 		.json(
-			new ApiResponse(200, {}, "Notification marked as read successfully")
+			new ApiResponse(200, {}, "Notification read status changed successfully")
 		);
 });
 
@@ -88,7 +87,7 @@ export {
 };
 
 /*
-get all user notifications
+get all user notifications ✔️
 toggle notification status ✔️
 delete notification ✔️
 */
