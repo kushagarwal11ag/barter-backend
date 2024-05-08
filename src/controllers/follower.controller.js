@@ -12,6 +12,21 @@ const getAllUserFollowers = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
 
+	let user = req.user;
+	if (req.user._id.toString() !== userId) {
+		user = await User.findById(userId);
+		if (!user) {
+			throw new ApiError(404, "User not found");
+		}
+		if (
+			user.isBanned ||
+			req.user.blockedUsers?.includes(userId) ||
+			user.blockedUsers?.includes(req.user._id)
+		) {
+			throw new ApiError(403, "Access denied");
+		}
+	}
+
 	const followers = await Follower.aggregate([
 		{
 			$match: {
@@ -23,7 +38,7 @@ const getAllUserFollowers = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "follower",
 				foreignField: "_id",
-				as: "user",
+				as: "follower",
 				pipeline: [
 					{
 						$addFields: {
@@ -32,16 +47,49 @@ const getAllUserFollowers = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
+							_id: 1,
 							avatar: 1,
 							name: 1,
+							isBanned: 1,
+							blockedUsers: 1,
 						},
 					},
 				],
 			},
 		},
 		{
+			$unwind: "$follower",
+		},
+		{
+			$match: {
+				$nor: [
+					{
+						"follower.blockedUsers": new mongoose.Types.ObjectId(
+							req.user._id
+						),
+					},
+					{
+						"follower._id": {
+							$in: req.user.blockedUsers?.map(
+								(id) => new mongoose.Types.ObjectId(id)
+							),
+						},
+					},
+				],
+			},
+		},
+		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
 			$project: {
-				user: 1,
+				follower: {
+					_id: 1,
+					name: 1,
+					avatar: 1,
+				},
 			},
 		},
 	]);
@@ -63,6 +111,21 @@ const getAllUserFollowing = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
 
+	let user = req.user;
+	if (req.user._id.toString() !== userId) {
+		user = await User.findById(userId);
+		if (!user) {
+			throw new ApiError(404, "User not found");
+		}
+		if (
+			user.isBanned ||
+			req.user.blockedUsers?.includes(userId) ||
+			user.blockedUsers?.includes(req.user._id)
+		) {
+			throw new ApiError(403, "Access denied");
+		}
+	}
+
 	const following = await Follower.aggregate([
 		{
 			$match: {
@@ -74,7 +137,7 @@ const getAllUserFollowing = asyncHandler(async (req, res) => {
 				from: "users",
 				localField: "following",
 				foreignField: "_id",
-				as: "user",
+				as: "following",
 				pipeline: [
 					{
 						$addFields: {
@@ -83,16 +146,49 @@ const getAllUserFollowing = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
+							_id: 1,
 							avatar: 1,
 							name: 1,
+							isBanned: 1,
+							blockedUsers: 1,
 						},
 					},
 				],
 			},
 		},
 		{
+			$unwind: "$following",
+		},
+		{
+			$match: {
+				$nor: [
+					{
+						"following.blockedUsers": new mongoose.Types.ObjectId(
+							req.user._id
+						),
+					},
+					{
+						"following._id": {
+							$in: req.user.blockedUsers?.map(
+								(id) => new mongoose.Types.ObjectId(id)
+							),
+						},
+					},
+				],
+			},
+		},
+		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
 			$project: {
-				user: 1,
+				following: {
+					_id: 1,
+					name: 1,
+					avatar: 1,
+				},
 			},
 		},
 	]);
@@ -121,9 +217,20 @@ const followUser = asyncHandler(async (req, res) => {
 	if (!user) {
 		throw new ApiError(404, "User not found");
 	}
+	if (
+		user.isBanned ||
+		user.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(userId)
+	) {
+		throw new ApiError(403, "Access denied.");
+	}
 
-	if (user.blockedUsers.includes(req.user._id)) {
-		throw new ApiError(403, "Access denied. You are blocked by this user.");
+	const checkFollow = await Follower.findOne({
+		following: userId,
+		follower: req.user._id,
+	});
+	if (checkFollow) {
+		throw new ApiError(403, "User already followed");
 	}
 
 	const follow = await Follower.create({
@@ -158,6 +265,18 @@ const unFollowUser = asyncHandler(async (req, res) => {
 
 	if (userId === req.user._id.toString()) {
 		throw new ApiError(400, "Cannot un-follow oneself");
+	}
+
+	const user = await User.findById(userId);
+	if (!user) {
+		throw new ApiError(404, "User not found");
+	}
+	if (
+		user.isBanned ||
+		user.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(userId)
+	) {
+		throw new ApiError(403, "Access denied.");
 	}
 
 	const result = await Follower.deleteOne({

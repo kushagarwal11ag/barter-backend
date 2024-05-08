@@ -77,6 +77,11 @@ const getAllUserFeedbacks = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
 			$project: {
 				content: 1,
 				rating: 1,
@@ -149,6 +154,11 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 						},
 					},
 				],
+			},
+		},
+		{
+			$sort: {
+				createdAt: -1,
 			},
 		},
 		{

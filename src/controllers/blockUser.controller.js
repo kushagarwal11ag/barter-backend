@@ -24,7 +24,13 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 						},
 					},
 					{
+						$match: {
+							isBanned: { $ne: true },
+						},
+					},
+					{
 						$project: {
+							_id: 1,
 							name: 1,
 							avatar: 1,
 						},
@@ -33,8 +39,13 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
 			$project: {
-				_id: 0,
+				_id: 1,
 				blockedUsersDetails: 1,
 			},
 		},
@@ -67,6 +78,9 @@ const blockUser = asyncHandler(async (req, res) => {
 	const blockUser = await User.findById(userId);
 	if (!blockUser) {
 		throw new ApiError(404, "User to block not found");
+	}
+	if (blockUser.isBanned) {
+		throw new ApiError(403, "Access denied.");
 	}
 
 	await User.findByIdAndUpdate(req.user._id, {

@@ -45,6 +45,7 @@ app.use("/api/v1/notification", notificationRouter);
 app.use((err, req, res, next) => {
 	if (err instanceof ApiError) {
 		res.status(err.statusCode).json({
+			statusCode: err.statusCode,
 			success: false,
 			message: err.message,
 			errors: err.errors,

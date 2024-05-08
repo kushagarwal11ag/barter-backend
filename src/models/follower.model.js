@@ -5,11 +5,13 @@ const followerSchema = new Schema({
 		// the one who is being followed
 		type: Schema.Types.ObjectId,
 		ref: "User",
+		index: true,
 	},
 	follower: {
 		// the one who follows
 		type: Schema.Types.ObjectId,
 		ref: "User",
+		index: true,
 	},
 });
 
