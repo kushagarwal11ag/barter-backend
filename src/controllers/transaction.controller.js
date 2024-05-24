@@ -406,10 +406,22 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			{ productOffered: productRequestedId },
 			{ productRequested: productRequestedId },
 		],
-		orderStatus: { $ne: ["cancel", "pending"] },
+		orderStatus: { $nin: ["cancel", "pending"] },
 	});
 	if (activeTransaction) {
-		throw new ApiError(409, "Transaction initiation conflict.");
+		throw new ApiError(
+			409,
+			"Cannot initiate transaction as product active in another transaction"
+		);
+	} else {
+		activeTransaction = await Transaction.findOne({
+			productRequested: productRequestedId,
+			initiator: req.user._id,
+			orderStatus: { $ne: "cancel" },
+		});
+		if (activeTransaction) {
+			throw new ApiError(409, "Cannot create duplicate transactions.");
+		}
 	}
 	if (
 		!productRequested.isAvailable ||
@@ -461,7 +473,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 				{ productOffered: productOfferedId },
 				{ productRequested: productOfferedId },
 			],
-			orderStatus: { $ne: ["cancel", "pending"] },
+			orderStatus: { $nin: ["cancel", "pending"] },
 		});
 		if (existingTransaction) {
 			throw new ApiError(409, "Transaction initiation conflict.");
@@ -487,13 +499,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 
 	return res
 		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				transaction,
-				"Transaction initiated successfully"
-			)
-		);
+		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
 });
 
 const updateTransactionAsInitiator = asyncHandler(async (req, res) => {
@@ -559,7 +565,7 @@ const updateTransactionAsInitiator = asyncHandler(async (req, res) => {
 			{ productRequested: transaction.productOffered },
 			{ productOffered: transaction.productOffered },
 		],
-		orderStatus: { $ne: ["pending", "cancel"] },
+		orderStatus: { $nin: ["pending", "cancel"] },
 	});
 	if (existingTransaction) {
 		await Transaction.findByIdAndUpdate(transactionId, {
@@ -724,7 +730,7 @@ const updateTransactionAsRecipient = asyncHandler(async (req, res) => {
 			{ productRequested: transaction.productOffered },
 			{ productOffered: transaction.productOffered },
 		],
-		orderStatus: { $ne: ["pending", "cancel"] },
+		orderStatus: { $nin: ["pending", "cancel"] },
 	});
 	if (existingTransaction) {
 		await Transaction.findByIdAndUpdate(transactionId, {

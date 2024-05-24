@@ -4,7 +4,8 @@ import {
 	getAllUserAsRecipientTransactions,
 	getTransactionDetails,
 	initiateTransaction,
-	updateTransaction,
+	updateTransactionAsInitiator,
+	updateTransactionAsRecipient,
 } from "../controllers/transaction.controller.js";
 import verifyJWT from "../middlewares/auth.middleware.js";
 import checkVerificationAndBan from "../middlewares/checkVerificationAndBan.middleware.js";
@@ -20,10 +21,15 @@ router
 	.get(verifyJWT, checkVerificationAndBan, getAllUserAsRecipientTransactions);
 router
 	.route("/:transactionId")
-	.get(verifyJWT, checkVerificationAndBan, getTransactionDetails)
-	.patch(verifyJWT, checkVerificationAndBan, updateTransaction);
+	.get(verifyJWT, checkVerificationAndBan, getTransactionDetails);
 router
 	.route("/add")
 	.post(verifyJWT, checkVerificationAndBan, initiateTransaction);
+router
+	.route("/initiate/:transactionId")
+	.patch(verifyJWT, checkVerificationAndBan, updateTransactionAsInitiator);
+router
+	.route("/recipient/:transactionId")
+	.patch(verifyJWT, checkVerificationAndBan, updateTransactionAsRecipient);
 
 export default router;
