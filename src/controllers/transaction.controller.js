@@ -8,10 +8,12 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
 const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
+	const userId = req.user._id;
+	const blocked = req.user.blockedUsers;
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
-				initiator: new mongoose.Types.ObjectId(req.user?._id),
+				initiator: new mongoose.Types.ObjectId(userId),
 			},
 		},
 		{
@@ -22,8 +24,50 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 				as: "product",
 				pipeline: [
 					{
+						$match: {
+							isAvailable: true,
+							owner: { $nin: blocked },
+						},
+					},
+					{
 						$addFields: {
 							image: "$image.url",
+						},
+					},
+					{
+						$lookup: {
+							from: "users",
+							localField: "owner",
+							foreignField: "_id",
+							as: "recipient",
+							pipeline: [
+								{
+									$match: {
+										blockedUsers: {
+											$nin: [
+												new mongoose.Types.ObjectId(
+													userId
+												),
+											],
+										},
+										isBanned: {
+											$ne: true,
+										},
+									},
+								},
+								{
+									$addFields: {
+										avatar: "$avatar.url",
+									},
+								},
+								{
+									$project: {
+										_id: 0,
+										name: 1,
+										avatar: 1,
+									},
+								},
+							],
 						},
 					},
 					{
@@ -31,28 +75,7 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 							_id: 0,
 							title: 1,
 							image: 1,
-						},
-					},
-				],
-			},
-		},
-		{
-			$lookup: {
-				from: "users",
-				localField: "recipient",
-				foreignField: "_id",
-				as: "recipient",
-				pipeline: [
-					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
-						$project: {
-							_id: 0,
-							name: 1,
-							avatar: 1,
+							owner: { $ifNull: ["$recipient", null] },
 						},
 					},
 				],
@@ -64,23 +87,10 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			$addFields: {
-				product: {
-					$first: "$product",
-				},
-				recipient: {
-					$first: "$recipient",
-				},
-			},
-		},
-		{
 			$project: {
-				transactionType: 1,
-				product: 1,
-				priceOffered: 1,
-				priceRequested: 1,
-				orderStatus: 1,
-				recipient: 1,
+				createdAt: 0,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
@@ -97,10 +107,12 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 });
 
 const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
+	const userId = req.user._id;
+	const blocked = req.user.blockedUsers;
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
-				recipient: new mongoose.Types.ObjectId(req.user?._id),
+				recipient: new mongoose.Types.ObjectId(userId),
 			},
 		},
 		{
@@ -111,8 +123,50 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 				as: "product",
 				pipeline: [
 					{
+						$match: {
+							isAvailable: true,
+							owner: { $nin: blocked },
+						},
+					},
+					{
 						$addFields: {
 							image: "$image.url",
+						},
+					},
+					{
+						$lookup: {
+							from: "users",
+							localField: "owner",
+							foreignField: "_id",
+							as: "recipient",
+							pipeline: [
+								{
+									$match: {
+										blockedUsers: {
+											$nin: [
+												new mongoose.Types.ObjectId(
+													userId
+												),
+											],
+										},
+										isBanned: {
+											$ne: true,
+										},
+									},
+								},
+								{
+									$addFields: {
+										avatar: "$avatar.url",
+									},
+								},
+								{
+									$project: {
+										_id: 0,
+										name: 1,
+										avatar: 1,
+									},
+								},
+							],
 						},
 					},
 					{
@@ -120,28 +174,7 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 							_id: 0,
 							title: 1,
 							image: 1,
-						},
-					},
-				],
-			},
-		},
-		{
-			$lookup: {
-				from: "users",
-				localField: "initiator",
-				foreignField: "_id",
-				as: "initiator",
-				pipeline: [
-					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
-						$project: {
-							_id: 0,
-							name: 1,
-							avatar: 1,
+							owner: { $ifNull: ["$recipient", null] },
 						},
 					},
 				],
@@ -153,23 +186,10 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			$addFields: {
-				product: {
-					$first: "$product",
-				},
-				initiator: {
-					$first: "$initiator",
-				},
-			},
-		},
-		{
 			$project: {
-				transactionType: 1,
-				product: 1,
-				priceOffered: 1,
-				priceRequested: 1,
-				orderStatus: 1,
-				initiator: 1,
+				createdAt: 0,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
@@ -192,6 +212,9 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing transaction ID");
 	}
 
+	const userId = req.user._id;
+	const blocked = req.user.blockedUsers;
+
 	const transaction = await Transaction.aggregate([
 		{
 			$match: {
@@ -212,14 +235,8 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
-							title: 1,
-							description: 1,
-							image: 1,
-							condition: 1,
-							category: 1,
-							isBarter: 1,
-							price: 1,
-							createdAt: 1,
+							updatedAt: 0,
+							__v: 0,
 						},
 					},
 				],
@@ -239,14 +256,8 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 					},
 					{
 						$project: {
-							title: 1,
-							description: 1,
-							image: 1,
-							condition: 1,
-							category: 1,
-							isBarter: 1,
-							price: 1,
-							createdAt: 1,
+							updatedAt: 0,
+							__v: 0,
 						},
 					},
 				],
@@ -296,6 +307,19 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		},
 		{
 			$addFields: {
+				isBlocked: {
+					$or: [
+						{
+							$in: [
+								new mongoose.Types.ObjectId(userId),
+								"$blockedUsers",
+							],
+						},
+						{
+							$in: ["$_id", blocked],
+						},
+					],
+				},
 				productOffer: {
 					$first: "$productOffer",
 				},
@@ -312,20 +336,18 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				transactionType: 1,
-				productOffer: 1,
-				productRequest: 1,
-				priceOffered: 1,
-				priceRequested: 1,
-				orderStatus: 1,
-				initiator: 1,
-				recipient: 1,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
 
 	if (!transaction.length) {
 		throw new ApiError(404, "Transaction not found");
+	}
+
+	if (transaction?.isBlocked) {
+		throw new ApiError(403, "Access forbidden. User blocked");
 	}
 
 	return res
@@ -340,7 +362,6 @@ const getTransactionDetails = asyncHandler(async (req, res) => {
 });
 
 const initiateTransaction = asyncHandler(async (req, res) => {
-	// prevent if user banned/blocked
 	const {
 		transactionType,
 		productOfferedId,
@@ -352,15 +373,14 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 	if (!productRequestedId || !isValidObjectId(productRequestedId)) {
 		throw new ApiError(400, "Invalid or missing product requested ID");
 	}
-	const productRequested = await Product.findById(productRequestedId);
+	const productRequested = await Product.findById(
+		productRequestedId
+	).populate({
+		path: "owner",
+		select: "_id, isBanned, blockedUsers",
+	});
 	if (!productRequested) {
 		throw new ApiError(404, "Requested product not found");
-	}
-	if (productRequested.owner.toString() === req.user._id.toString()) {
-		throw new ApiError(
-			403,
-			"Cannot initiate transaction with own product."
-		);
 	}
 
 	const { error } = validateTransaction({
@@ -373,6 +393,31 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			400,
 			`Validation error: ${error.details[0].message}`
 		);
+	}
+
+	if (productRequested.owner._id.toString() === req.user._id.toString()) {
+		throw new ApiError(
+			403,
+			"Cannot initiate transaction with own product."
+		);
+	}
+	let activeTransaction = await Transaction.findOne({
+		$or: [
+			{ productOffered: productRequestedId },
+			{ productRequested: productRequestedId },
+		],
+		orderStatus: { $ne: ["cancel", "pending"] },
+	});
+	if (activeTransaction) {
+		throw new ApiError(409, "Transaction initiation conflict.");
+	}
+	if (
+		!productRequested.isAvailable ||
+		productRequested.owner.isBanned ||
+		productRequested.owner.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(productRequested.owner._id)
+	) {
+		throw new ApiError(403, "Access forbidden.");
 	}
 
 	const isBarter = transactionType === "barter";
@@ -394,9 +439,11 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		} else {
 			newPriceOffered = newPriceRequested = 0;
 		}
+	} else if (isHybrid && newPriceOffered === 0 && newPriceRequested === 0) {
+		throw new ApiError(400, "Enter amount to initiate Hybrid exchange");
 	}
 
-	let productOffered, existingTransaction;
+	let productOffered;
 	if (isBarter || isHybrid) {
 		if (!productOfferedId || !isValidObjectId(productOfferedId)) {
 			throw new ApiError(400, "Invalid or missing product offered ID");
@@ -409,37 +456,33 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			throw new ApiError(403, "Access forbidden");
 		}
 
-		existingTransaction = await Transaction.findOne({
-			productOffered: productOfferedId,
-			orderStatus: { $ne: "cancel" },
+		const existingTransaction = await Transaction.findOne({
+			$or: [
+				{ productOffered: productOfferedId },
+				{ productRequested: productOfferedId },
+			],
+			orderStatus: { $ne: ["cancel", "pending"] },
 		});
-	}
-
-	if (!existingTransaction && isSale) {
-		existingTransaction = await Transaction.findOne({
-			productRequested: productRequestedId,
-			initiator: req.user._id,
-		});
-	}
-	if (existingTransaction) {
-		throw new ApiError(409, "Transaction initiation conflict.");
+		if (existingTransaction) {
+			throw new ApiError(409, "Transaction initiation conflict.");
+		}
 	}
 
 	const transaction = await Transaction.create({
 		transactionType,
 		productOffered: isBarter || isHybrid ? productOfferedId : undefined,
 		productRequested: productRequestedId,
-		priceOffered: isSale || isHybrid ? newPriceOffered : undefined,
-		priceRequested: isHybrid ? newPriceRequested : undefined,
+		priceOffered: isSale || isHybrid ? newPriceOffered : 0,
+		priceRequested: isHybrid ? newPriceRequested : 0,
 		initiator: req.user._id,
-		recipient: productRequested?.owner,
+		recipient: productRequested.owner._id,
 	});
 
 	await Notification.create({
 		transactionId: transaction._id,
 		notificationType: "transaction",
 		content: "Transaction requested",
-		user: productRequested.owner,
+		user: productRequested.owner._id,
 	});
 
 	return res
@@ -453,7 +496,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 });
 
-const updateTransaction = asyncHandler(async (req, res) => {
+const updateTransactionAsInitiator = asyncHandler(async (req, res) => {
 	const { priceOffered, priceRequested, orderStatus } = req.body;
 	const { transactionId } = req.params;
 
@@ -473,40 +516,305 @@ const updateTransaction = asyncHandler(async (req, res) => {
 		);
 	}
 
-	if ((priceOffered || priceRequested) && orderStatus !== "counter") {
+	const transaction = await Transaction.findById(transactionId);
+	if (!transaction) {
+		throw new ApiError(404, "Transaction not found");
+	}
+	if (transaction.initiator.toString() !== req.user._id.toString()) {
+		throw new ApiError(403, "Access forbidden");
+	}
+	if (
+		transaction.orderStatus === "cancel" ||
+		transaction.orderStatus === "complete" ||
+		transaction.orderStatus === "accept" ||
+		orderStatus === "accept" ||
+		orderStatus === "complete"
+	) {
+		throw new ApiError(403, "Access denied.");
+	}
+
+	const productRequestedDetails = transaction.populate({
+		path: "productRequested",
+		populate: {
+			path: "owner",
+			select: "_id, isBanned, blockedUsers",
+		},
+	});
+
+	if (
+		productRequestedDetails.owner.isBanned ||
+		productRequestedDetails.owner.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(productRequestedDetails.owner._id)
+	) {
 		throw new ApiError(403, "Access forbidden.");
+	}
+
+	const existingTransaction = await Transaction.findOne({
+		_id: { $ne: transactionId },
+		$or: [
+			{ productRequested: transaction.productRequested },
+			{ productOffered: transaction.productRequested },
+		],
+		$or: [
+			{ productRequested: transaction.productOffered },
+			{ productOffered: transaction.productOffered },
+		],
+		orderStatus: { $ne: ["pending", "cancel"] },
+	});
+	if (existingTransaction) {
+		await Transaction.findByIdAndUpdate(transactionId, {
+			orderStatus: "cancel",
+		});
+		throw new ApiError(
+			403,
+			"This transaction cannot be completed. Another transaction in progress."
+		);
+	}
+
+	if (orderStatus === "cancel") {
+		await Transaction.findByIdAndUpdate(transactionId, {
+			orderStatus: "cancel",
+		});
+
+		await Notification.create({
+			transactionId: transactionId,
+			notificationType: "transaction",
+			content: "Transaction cancelled",
+			user: transaction.recipient,
+		});
+
+		return res
+			.status(200)
+			.json(
+				200,
+				new ApiResponse(200, {}, "Transaction cancelled successfully")
+			);
+	}
+
+	const isSale = transaction.transactionType === "sale";
+	const isHybrid = transaction.transactionType === "hybrid";
+
+	if (isSale) {
+		if (
+			priceOffered !== transaction.priceOffered &&
+			orderStatus !== "cancel"
+		) {
+			await Transaction.findByIdAndUpdate(transactionId, {
+				priceOffered,
+			});
+
+			await Notification.create({
+				transactionId: transactionId,
+				notificationType: "transaction",
+				content: "Transaction price updated",
+				user: transaction.recipient,
+			});
+
+			return res
+				.status(200)
+				.json(
+					200,
+					new ApiResponse(200, {}, "Transaction updated successfully")
+				);
+		} else {
+			throw new ApiError(400, "Proper fields for updating not provided.");
+		}
+	}
+
+	if (isHybrid) {
+		if (
+			priceOffered >= 0 &&
+			priceRequested >= 0 &&
+			orderStatus !== "cancel"
+		) {
+			if (priceOffered > priceRequested) {
+				priceOffered = priceOffered - priceRequested;
+				priceRequested = 0;
+			} else if (priceOffered < priceRequested) {
+				priceRequested = priceRequested - priceOffered;
+				priceOffered = 0;
+			} else {
+				priceOffered = priceRequested = 0;
+			}
+			await Transaction.findByIdAndUpdate(transactionId, {
+				priceOffered,
+				priceRequested,
+			});
+
+			await Notification.create({
+				transactionId: transactionId,
+				notificationType: "transaction",
+				content: "Transaction price updated",
+				user: transaction.recipient,
+			});
+
+			return res
+				.status(200)
+				.json(
+					200,
+					new ApiResponse(200, {}, "Transaction updated successfully")
+				);
+		} else {
+			throw new ApiError(400, "Proper fields for updating not provided.");
+		}
+	}
+
+	throw new ApiError(400, "Proper fields for updating not provided.");
+});
+
+const updateTransactionAsRecipient = asyncHandler(async (req, res) => {
+	const { priceOffered, priceRequested, orderStatus } = req.body;
+	const { transactionId } = req.params;
+
+	if (!transactionId || !isValidObjectId(transactionId)) {
+		throw new ApiError(400, "Invalid or missing transaction ID");
+	}
+
+	const { error } = validateTransaction({
+		priceOffered,
+		priceRequested,
+		orderStatus,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
 	}
 
 	const transaction = await Transaction.findById(transactionId);
 	if (!transaction) {
 		throw new ApiError(404, "Transaction not found");
 	}
-
-	if (orderStatus === "accept" || orderStatus === "complete") {
-		if (transaction.recipient.toString() !== req.user._id.toString()) {
-			throw new ApiError(403, "Access forbidden.");
-		}
+	if (transaction.recipient.toString() !== req.user._id.toString()) {
+		throw new ApiError(403, "Access forbidden");
+	}
+	if (
+		transaction.orderStatus === "cancel" ||
+		transaction.orderStatus === "complete" ||
+		transaction.orderStatus === "accept" ||
+		orderStatus === "complete"
+	) {
+		throw new ApiError(403, "Access denied.");
 	}
 
-	await Transaction.findByIdAndUpdate(transactionId, {
-		$set: {
-			priceOffered:
-				transaction.transactionType === "sale" ||
-				transaction.transactionType === "hybrid"
-					? priceOffered
-					: 0,
-			priceRequested:
-				transaction.transactionType === "sale" ||
-				transaction.transactionType === "hybrid"
-					? priceRequested
-					: 0,
-			orderStatus,
+	const productOfferedDetails = transaction.populate({
+		path: "productOffered",
+		populate: {
+			path: "owner",
+			select: "_id, isBanned, blockedUsers",
 		},
 	});
 
-	return res
-		.status(200)
-		.json(new ApiResponse(200, {}, "Transaction updated successfully"));
+	if (
+		productOfferedDetails.owner.isBanned ||
+		productOfferedDetails.owner.blockedUsers?.includes(req.user._id) ||
+		req.user.blockedUsers?.includes(productOfferedDetails.owner._id)
+	) {
+		throw new ApiError(403, "Access forbidden.");
+	}
+
+	const existingTransaction = await Transaction.findOne({
+		_id: { $ne: transactionId },
+		$or: [
+			{ productRequested: transaction.productRequested },
+			{ productOffered: transaction.productRequested },
+		],
+		$or: [
+			{ productRequested: transaction.productOffered },
+			{ productOffered: transaction.productOffered },
+		],
+		orderStatus: { $ne: ["pending", "cancel"] },
+	});
+	if (existingTransaction) {
+		await Transaction.findByIdAndUpdate(transactionId, {
+			orderStatus: "cancel",
+		});
+		throw new ApiError(
+			403,
+			"This transaction cannot be completed. Another transaction in progress."
+		);
+	}
+
+	if (orderStatus === "cancel") {
+		await Transaction.findByIdAndUpdate(transactionId, {
+			orderStatus: "cancel",
+		});
+
+		await Notification.create({
+			transactionId: transactionId,
+			notificationType: "transaction",
+			content: "Transaction cancelled",
+			user: transaction.initiator,
+		});
+
+		return res
+			.status(200)
+			.json(
+				200,
+				new ApiResponse(200, {}, "Transaction cancelled successfully")
+			);
+	} else if (orderStatus === "accept") {
+		await Transaction.findByIdAndUpdate(transactionId, {
+			orderStatus: "accept",
+		});
+
+		await Notification.create({
+			transactionId: transactionId,
+			notificationType: "transaction",
+			content: "Transaction accepted",
+			user: transaction.initiator,
+		});
+
+		return res
+			.status(200)
+			.json(
+				200,
+				new ApiResponse(200, {}, "Transaction accepted successfully")
+			);
+	}
+
+	const isHybrid = transaction.transactionType === "hybrid";
+
+	if (isHybrid) {
+		if (
+			priceOffered >= 0 &&
+			priceRequested >= 0 &&
+			orderStatus !== "cancel"
+		) {
+			if (priceOffered > priceRequested) {
+				priceOffered = priceOffered - priceRequested;
+				priceRequested = 0;
+			} else if (priceOffered < priceRequested) {
+				priceRequested = priceRequested - priceOffered;
+				priceOffered = 0;
+			} else {
+				priceOffered = priceRequested = 0;
+			}
+			await Transaction.findByIdAndUpdate(transactionId, {
+				priceOffered,
+				priceRequested,
+			});
+
+			await Notification.create({
+				transactionId: transactionId,
+				notificationType: "transaction",
+				content: "Transaction price updated",
+				user: transaction.initiator,
+			});
+
+			return res
+				.status(200)
+				.json(
+					200,
+					new ApiResponse(200, {}, "Transaction updated successfully")
+				);
+		} else {
+			throw new ApiError(400, "Proper fields for updating not provided.");
+		}
+	}
+
+	throw new ApiError(400, "Proper fields for updating not provided.");
 });
 
 export {
@@ -514,7 +822,8 @@ export {
 	getAllUserAsRecipientTransactions,
 	getTransactionDetails,
 	initiateTransaction,
-	updateTransaction,
+	updateTransactionAsInitiator,
+	updateTransactionAsRecipient,
 };
 
 /*
@@ -522,7 +831,5 @@ get all user as initiator transactions ✔️
 get all user as recipient transactions ✔️
 get transaction details ✔️
 initiate transaction - send notification ✔️
-update transaction status - send notification
-
-// if any product is not available, change status of transaction and return
+update transaction status - send notification ✔️
 */

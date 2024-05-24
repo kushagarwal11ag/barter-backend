@@ -28,7 +28,7 @@ const transactionSchema = new Schema(
 		},
 		orderStatus: {
 			type: String,
-			enum: ["pending", "counter", "cancel", "accept", "complete"],
+			enum: ["pending", "cancel", "accept", "complete"],
 			default: "pending",
 		},
 		initiator: {

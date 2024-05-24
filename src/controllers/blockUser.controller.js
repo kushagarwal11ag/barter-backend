@@ -1,5 +1,6 @@
 import mongoose, { isValidObjectId } from "mongoose";
 import User from "../models/user.model.js";
+import Transaction from "../models/transaction.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
@@ -81,6 +82,17 @@ const blockUser = asyncHandler(async (req, res) => {
 	}
 	if (blockUser.isBanned) {
 		throw new ApiError(403, "Access denied.");
+	}
+
+	const existingTransaction = await Transaction.findOne({
+		$or: [
+			{ initiator: blockUser },
+			{ recipient: blockUser },
+		],
+		orderStatus: "accept",
+	});
+	if (existingTransaction) {
+		throw new ApiError(403, "Access denied. Transaction in progress");
 	}
 
 	await User.findByIdAndUpdate(req.user._id, {

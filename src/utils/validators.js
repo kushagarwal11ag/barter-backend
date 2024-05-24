@@ -48,7 +48,7 @@ const transactionSchema = Joi.object({
 	transactionType: Joi.string().valid("barter", "sale", "hybrid"),
 	priceOffered: Joi.number().min(0),
 	priceRequested: Joi.number().min(0),
-	orderStatus: Joi.string().valid("accept", "complete", "cancel", "counter"),
+	orderStatus: Joi.string().valid("pending", "accept", "complete", "cancel"),
 }).or("transactionType", "priceOffered", "priceRequested", "orderStatus");
 
 const feedbackSchema = Joi.object({
