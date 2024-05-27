@@ -25,23 +25,19 @@ const productSchema = Joi.object({
 	description: Joi.string().trim().min(10).max(150),
 	condition: Joi.string().trim().valid("new", "good", "fair", "poor"),
 	category: Joi.string().trim().min(3).max(30),
-	isBarter: Joi.boolean(),
 	barterCategory: Joi.string().trim().min(3).max(30),
-	barterDescription: Joi.string().trim(),
+	barterDescription: Joi.string().trim().min(10).max(150),
 	price: Joi.number().min(0),
-	meetingSpot: Joi.string().trim().min(10).max(100),
-	isAvailable: Joi.boolean(),
+	meetingSpot: Joi.string().trim().min(10).max(150),
 }).or(
 	"title",
 	"description",
 	"condition",
 	"category",
-	"isBarter",
 	"barterCategory",
 	"barterDescription",
 	"price",
 	"meetingSpot",
-	"isAvailable"
 );
 
 const transactionSchema = Joi.object({

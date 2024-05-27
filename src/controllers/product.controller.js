@@ -123,6 +123,13 @@ const getProductById = asyncHandler(async (req, res) => {
 	if (!productId || !isValidObjectId(productId)) {
 		throw new ApiError(400, "Invalid or missing product ID");
 	}
+
+	await Product.findByIdAndUpdate(productId, {
+		$addToSet: {
+			views: userId,
+		},
+	});
+
 	const product = await Product.aggregate([
 		{
 			$match: {
@@ -166,6 +173,7 @@ const getProductById = asyncHandler(async (req, res) => {
 		{
 			$project: {
 				_id: 0,
+				isAvailable: 0,
 				views: 0,
 				updatedAt: 0,
 				__v: 0,
@@ -180,7 +188,7 @@ const getProductById = asyncHandler(async (req, res) => {
 	if (
 		product[0].owner.isBanned ||
 		(userId.toString() !== product[0].owner._id.toString() &&
-			!product[0].isAvailable)
+			product[0].isAvailable === false)
 	)
 		throw new ApiError(403, "Access forbidden.");
 
@@ -229,18 +237,19 @@ const createProduct = asyncHandler(async (req, res) => {
 		isAvailable,
 	} = req.body;
 
+	const isBarterBool = JSON.parse(isBarter);
+	const isAvailableBool = JSON.parse(isAvailable);
+
 	const imageLocalPath = req.file?.path;
 	if (!imageLocalPath) {
 		throw new ApiError(400, "Image file required");
 	}
-
 	const { error } = validateProduct({
 		title,
 		description,
 		condition,
 		category,
 		meetingSpot,
-		isAvailable,
 	});
 	if (error) {
 		throw new ApiError(
@@ -249,9 +258,8 @@ const createProduct = asyncHandler(async (req, res) => {
 		);
 	}
 
-	if (isBarter) {
+	if (isBarterBool) {
 		const { error } = validateProduct({
-			isBarter,
 			barterCategory,
 			barterDescription,
 		});
@@ -292,12 +300,12 @@ const createProduct = asyncHandler(async (req, res) => {
 		},
 		condition,
 		category,
-		isBarter,
+		isBarter: isBarterBool,
 		barterCategory,
 		barterDescription,
 		price,
 		meetingSpot,
-		isAvailable,
+		isAvailable: isAvailableBool,
 		owner: req.user._id,
 	});
 
@@ -315,6 +323,9 @@ const updateProduct = asyncHandler(async (req, res) => {
 		meetingSpot,
 		isAvailable,
 	} = req.body;
+
+	const isAvailableBool = JSON.parse(isAvailable);
+	
 	const imageLocalPath = req.file?.path;
 	const { productId } = req.params;
 
@@ -325,7 +336,6 @@ const updateProduct = asyncHandler(async (req, res) => {
 	const { error } = validateProduct({
 		description,
 		meetingSpot,
-		isAvailable,
 	});
 	if (error) {
 		throw new ApiError(
@@ -352,9 +362,9 @@ const updateProduct = asyncHandler(async (req, res) => {
 			throw new ApiError(
 				400,
 				`Validation error: ${error.details[0].message}`
-				);
-			}
+			);
 		}
+	}
 
 	if (price) {
 		const { error } = validateProduct({
@@ -392,7 +402,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 				barterDescription: product.isBarter ? barterDescription : null,
 				price,
 				meetingSpot,
-				isAvailable,
+				isAvailable: isAvailableBool,
 				image: {
 					id: image ? image.public_id : product.image.id,
 					url: image ? image.url : product.image.url,
