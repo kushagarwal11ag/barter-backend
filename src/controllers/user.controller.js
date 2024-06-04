@@ -242,6 +242,7 @@ const getUserById = asyncHandler(async (req, res) => {
 				isBanned: 1,
 				isBlocked: 1,
 				product: {
+					_id: 1,
 					title: 1,
 					image: 1,
 					category: 1,
