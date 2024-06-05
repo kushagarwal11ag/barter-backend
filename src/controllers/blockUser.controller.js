@@ -115,10 +115,6 @@ const unblockUser = asyncHandler(async (req, res) => {
 		);
 	}
 
-	if (req.user._id.toString() === userId) {
-		throw new ApiError(400, "Cannot unblock oneself.");
-	}
-
 	await User.findByIdAndUpdate(req.user._id, {
 		$pull: {
 			blockedUsers: userId,

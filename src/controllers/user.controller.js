@@ -7,6 +7,7 @@ import Transaction from "../models/transaction.model.js";
 import Notification from "../models/notification.model.js";
 import Message from "../models/message.model.js";
 import Feedback from "../models/feedback.model.js";
+import Follower from "../models/follower.model.js";
 import { validateUser } from "../utils/validators.js";
 import {
 	uploadOnCloudinary,
@@ -178,6 +179,11 @@ const getUserById = asyncHandler(async (req, res) => {
 		throw new ApiError(400, "Invalid or missing user ID");
 	}
 
+	const isFollow = await Follower.exists({
+		following: userId,
+		follower: req.user._id,
+	});
+
 	const user = await User.aggregate([
 		{
 			$match: {
@@ -247,6 +253,7 @@ const getUserById = asyncHandler(async (req, res) => {
 					image: 1,
 					category: 1,
 				},
+				createdAt: 1,
 			},
 		},
 	]);
@@ -261,9 +268,14 @@ const getUserById = asyncHandler(async (req, res) => {
 	delete user[0]?.isBlocked;
 	delete user[0]?.isBanned;
 
+	const userDetails = {
+		...user[0],
+		isFollow: isFollow ? true : false,
+	};
+
 	return res
 		.status(200)
-		.json(new ApiResponse(200, user[0], "User retrieved successfully"));
+		.json(new ApiResponse(200, userDetails, "User retrieved successfully"));
 });
 
 const updateUserDetails = asyncHandler(async (req, res) => {

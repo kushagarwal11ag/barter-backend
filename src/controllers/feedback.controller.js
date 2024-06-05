@@ -298,7 +298,12 @@ const deleteFeedback = asyncHandler(async (req, res) => {
 	if (!feedback) {
 		throw new ApiError(404, "Feedback not found");
 	}
-	if (feedback.feedbackBy.toString() !== req.user._id.toString()) {
+	if (
+		!(
+			feedback.feedbackBy.toString() === req.user._id.toString() ||
+			feedback.feedbackFor.toString() === req.user._id.toString()
+		)
+	) {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
