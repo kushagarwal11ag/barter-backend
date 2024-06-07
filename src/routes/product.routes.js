@@ -14,16 +14,18 @@ import checkVerificationAndBan from "../middlewares/checkVerificationAndBan.midd
 const router = Router();
 
 // secured routes
-router.route("/all").get(verifyJWT, checkVerificationAndBan, getAllProducts);
-router.route("/my").get(verifyJWT, checkVerificationAndBan, getUserProducts);
 router
 	.route("/")
+	.get(verifyJWT, checkVerificationAndBan, getAllProducts)
 	.post(
 		verifyJWT,
 		checkVerificationAndBan,
 		upload.single("image"),
 		createProduct
 	);
+router
+	.route("/user/:userId")
+	.get(verifyJWT, checkVerificationAndBan, getUserProducts);
 router
 	.route("/:productId")
 	.get(verifyJWT, checkVerificationAndBan, getProductById)

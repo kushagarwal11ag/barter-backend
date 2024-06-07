@@ -78,40 +78,82 @@ const getAllProducts = asyncHandler(async (req, res) => {
 });
 
 const getUserProducts = asyncHandler(async (req, res) => {
-	const products = await Product.aggregate([
-		{
-			$match: {
-				owner: new mongoose.Types.ObjectId(req.user._id),
+	const { userId } = req.params;
+	if (!userId || !isValidObjectId(userId)) {
+		throw new ApiError(400, "Invalid or missing user ID");
+	}
+
+	let products;
+
+	if (userId.toString() === req.user._id.toString()) {
+		products = await Product.aggregate([
+			{
+				$match: {
+					owner: new mongoose.Types.ObjectId(userId),
+				},
 			},
-		},
-		{
-			$addFields: {
-				image: "$image.url",
+			{
+				$group: {
+					_id: "$owner",
+					productCount: {
+						$sum: 1,
+					},
+					products: {
+						$push: {
+							_id: "$_id",
+							title: "$title",
+							image: "$image.url",
+							category: "$category",
+							isAvailable: "$isAvailable",
+						},
+					},
+				},
 			},
-		},
-		{
-			$sort: {
-				createdAt: -1,
+			{
+				$sort: {
+					"products.createdAt": -1,
+				},
 			},
-		},
-		{
-			$project: {
-				title: 1,
-				image: 1,
-				category: 1,
-				isBarter: 1,
-				price: 1,
-				isAvailable: 1,
+		]);
+	} else {
+		products = await Product.aggregate([
+			{
+				$match: {
+					owner: new mongoose.Types.ObjectId(userId),
+					isAvailable: true,
+				},
 			},
-		},
-	]);
+			{
+				$group: {
+					_id: "$owner",
+					productCount: {
+						$sum: 1,
+					},
+					products: {
+						$push: {
+							_id: "$_id",
+							title: "$title",
+							image: "$image.url",
+							category: "$category",
+							isAvailable: "$isAvailable",
+						},
+					},
+				},
+			},
+			{
+				$sort: {
+					"products.createdAt": -1,
+				},
+			},
+		]);
+	}
 
 	return res
 		.status(200)
 		.json(
 			new ApiResponse(
 				200,
-				products,
+				products?.[0],
 				"All user products retrieved successfully"
 			)
 		);
@@ -325,7 +367,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 	} = req.body;
 
 	const isAvailableBool = JSON.parse(isAvailable);
-	
+
 	const imageLocalPath = req.file?.path;
 	const { productId } = req.params;
 

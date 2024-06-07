@@ -191,21 +191,6 @@ const getUserById = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			$lookup: {
-				from: "products",
-				localField: "_id",
-				foreignField: "owner",
-				as: "product",
-				pipeline: [
-					{
-						$match: {
-							isAvailable: true,
-						},
-					},
-				],
-			},
-		},
-		{
 			$addFields: {
 				avatar: "$avatar.url",
 				banner: "$banner.url",
@@ -247,12 +232,6 @@ const getUserById = asyncHandler(async (req, res) => {
 				rating: 1,
 				isBanned: 1,
 				isBlocked: 1,
-				product: {
-					_id: 1,
-					title: 1,
-					image: 1,
-					category: 1,
-				},
 				createdAt: 1,
 			},
 		},
