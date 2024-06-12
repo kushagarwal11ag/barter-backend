@@ -308,6 +308,7 @@ const deleteFeedback = asyncHandler(async (req, res) => {
 	}
 
 	await Feedback.findByIdAndDelete(feedbackId);
+	await Notification.deleteOne({feedbackId: feedbackId})
 
 	return res
 		.status(200)

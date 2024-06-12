@@ -14,18 +14,40 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 		},
 		{
 			$lookup: {
-				from: "users",
+				from: "feedbacks",
 				localField: "feedbackId",
 				foreignField: "_id",
-				as: "feedbackUser",
+				as: "feedbackDetails",
 				pipeline: [
 					{
-						$project: {
-							_id: 1,
-							avatar: "$avatar.url",
+						$lookup: {
+							from: "users",
+							localField: "feedbackBy",
+							foreignField: "_id",
+							as: "feedbackByUser",
+							pipeline: [
+								{
+									$project: {
+										_id: 1,
+										avatar: "$avatar.url",
+									},
+								},
+							],
+						},
+					},
+					{
+						$unwind: {
+							path: "$feedbackByUser",
+							preserveNullAndEmptyArrays: true,
 						},
 					},
 				],
+			},
+		},
+		{
+			$unwind: {
+				path: "$feedbackDetails",
+				preserveNullAndEmptyArrays: true,
 			},
 		},
 		{
@@ -42,6 +64,12 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 						},
 					},
 				],
+			},
+		},
+		{
+			$unwind: {
+				path: "$followedByUser",
+				preserveNullAndEmptyArrays: true,
 			},
 		},
 		{
@@ -119,17 +147,21 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
 			$project: {
-				feedbackId: 1,
-				followedById: 1,
 				transactionId: 1,
 				notificationType: 1,
 				content: 1,
 				isRead: 1,
 				createdAt: 1,
-				feedbackUser: 1,
+				feedbackByUser: "$feedbackDetails.feedbackByUser",
 				followedByUser: 1,
 				transactionUser: "$transactionDetails.userDetails",
+				user: 1,
 			},
 		},
 	]);

@@ -85,6 +85,7 @@ const getAllUserFollowers = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
+				_id: 0,
 				follower: {
 					_id: 1,
 					name: 1,
@@ -247,7 +248,7 @@ const followUser = asyncHandler(async (req, res) => {
 		await Notification.create({
 			followedById: req.user._id,
 			notificationType: "follow",
-			content: "You have gained a follower",
+			content: "You have a new follower",
 			user: userId,
 		});
 	}
@@ -264,19 +265,7 @@ const unFollowUser = asyncHandler(async (req, res) => {
 	}
 
 	if (userId === req.user._id.toString()) {
-		throw new ApiError(400, "Cannot un-follow oneself");
-	}
-
-	const user = await User.findById(userId);
-	if (!user) {
-		throw new ApiError(404, "User not found");
-	}
-	if (
-		user.isBanned ||
-		user.blockedUsers?.includes(req.user._id) ||
-		req.user.blockedUsers?.includes(userId)
-	) {
-		throw new ApiError(403, "Access denied.");
+		throw new ApiError(400, "Cannot unfollow oneself");
 	}
 
 	const result = await Follower.deleteOne({
@@ -286,6 +275,7 @@ const unFollowUser = asyncHandler(async (req, res) => {
 	if (!result.deletedCount) {
 		throw new ApiError(404, "Follow relationship not found");
 	}
+	await Notification.deleteOne({ followedById: req.user._id, user: userId });
 
 	return res
 		.status(200)

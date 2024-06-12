@@ -57,7 +57,6 @@ const getAllProducts = asyncHandler(async (req, res) => {
 				image: 1,
 				category: 1,
 				isBarter: 1,
-				price: 1,
 				owner: {
 					name: 1,
 					avatar: "$owner.avatar.url",

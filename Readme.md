@@ -6,22 +6,23 @@ Welcome to the SwapEase, a dynamic barter platform where users can exchange good
 
 1. **User Management**: Register, login, update profiles, and manage authentication.
 2. **Product Listings**: Users can create, update, delete, and browse products.
-3. **Wishlist System**: Users can add products to a personal wishlist for future reference.
-4. **Product Interests**: Track which users are interested in specific products.
+3. **Product Transactions**: Users can initiate transactions with the capability to barter/sell products or both.
+4. **Wishlist System**: Users can add products to a personal wishlist for future reference.
 5. **Search and Filter**: Advanced search and filtering capabilities based on product categories, condition, and more.
-6. **Real-Time Notifications**: Notify users about changes to products they are interested in or own.
+6. **Real-Time Notifications**: Notify users about changes to products.
+7. **Real-Time Chats**: Users can communicate with each other
 
 ## Technology Stack
 
-1. **Backend**: Node.js, Express
-2. **Database**: MongoDB with Mongoose ODM
-3. **Frontend**: Next.js, Redux for state management
-4. **Authentication**: JWT for secure authentication
-5. **File Storage**: Cloudinary
-6. **Validation**: JOI
-7. **File Handling**: Multer
-8. **API Testing**: Postman for API route testing
-9. **Deployment**: Vercel
+- **Backend**: Node.js, Express
+- **Database**: MongoDB with Mongoose ODM
+- **Frontend**: Next.js, Redux for state management
+- **Authentication**: JWT for secure authentication
+- **File Storage**: Cloudinary
+- **Validation**: JOI
+- **File Handling**: Multer
+- **API Testing**: Postman for API route testing
+- **Deployment**: Vercel
 
 ## Getting Started
 
@@ -39,7 +40,7 @@ A step-by-step guide that tell you how to get a development environment running:
 
 - Clone the repository
 ```
-git clone https://github.com/kushagarwal11ag/producer-pantry-backend.git
+git clone https://github.com/kushagarwal11ag/barter-backend.git
 ```
 
 - Install dependencies
@@ -54,7 +55,7 @@ npm install
 npm run dev
 ```
 
-- Run the APIs in postman at `http://localhost:8000` to test the application
+- Run the APIs in postman at `http://localhost:${process.env.PORT}` to test the application
 
 ## Authors
 Kushal Agarwal - [Github](https://github.com/kushagarwal11ag)
