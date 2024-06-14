@@ -28,11 +28,6 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 						},
 					},
 					{
-						$addFields: {
-							image: "$image.url",
-						},
-					},
-					{
 						$lookup: {
 							from: "users",
 							localField: "owner",
@@ -54,25 +49,27 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 									},
 								},
 								{
-									$addFields: {
-										avatar: "$avatar.url",
-									},
-								},
-								{
 									$project: {
+										_id: 0,
 										name: 1,
-										avatar: 1,
+										avatar: "$avatar.url",
 									},
 								},
 							],
 						},
 					},
 					{
+						$unwind: {
+							path: "$ownerDetails",
+							preserveNullAndEmptyArrays: false,
+						},
+					},
+					{
 						$project: {
 							title: 1,
-							image: 1,
+							image: "$image.url",
 							category: 1,
-							owner: { $ifNull: ["$ownerDetails", null] },
+							owner: "$ownerDetails",
 						},
 					},
 				],
@@ -91,7 +88,7 @@ const getUserWishlist = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				wishlist?.[0],
+				wishlist?.[0]?.products,
 				"User wishlist retrieved successfully"
 			)
 		);

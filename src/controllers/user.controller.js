@@ -353,41 +353,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const deleteAccount = asyncHandler(async (req, res) => {
-	const userId = req.user?._id;
-
-	await User.deleteOne({ _id: userId });
-	await Product.deleteMany({ owner: userId });
-	await Transaction.deleteMany({
-		$or: [
-			{
-				initiator: userId,
-			},
-			{
-				recipient: userId,
-			},
-		],
-	});
-	await Notification.deleteMany({ user: userId });
-	await Message.deleteMany({
-		$or: [
-			{
-				from: userId,
-			},
-			{
-				to: userId,
-			},
-		],
-	});
-	await Feedback.deleteMany({
-		$or: [
-			{
-				feedBackTo: userId,
-			},
-			{
-				feedBackBy: userId,
-			},
-		],
-	});
+	await req.user.remove();
 
 	return res
 		.status(200)

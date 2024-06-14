@@ -18,7 +18,7 @@ const getAllProducts = asyncHandler(async (req, res) => {
 		{
 			$match: {
 				isAvailable: true,
-				owner: { $nin: blocked }, // Exclude products if product owner is blocked
+				owner: { $nin: blocked },
 			},
 		},
 		{
@@ -34,16 +34,15 @@ const getAllProducts = asyncHandler(async (req, res) => {
 		},
 		{
 			$match: {
-				"ownerDetails.isBanned": { $ne: true }, // Exclude products where the owner is banned
+				"ownerDetails.isBanned": { $ne: true },
 				"ownerDetails.blockedUsers": {
 					$ne: new mongoose.Types.ObjectId(req.user._id),
-				}, // Exclude products where the owner has blocked the logged-in user
+				},
 			},
 		},
 		{
 			$addFields: {
-				owner: "$ownerDetails",
-				image: "$image.url",
+				isWishlist: { $in: ["$_id", req.user.wishlist] },
 			},
 		},
 		{
@@ -54,12 +53,13 @@ const getAllProducts = asyncHandler(async (req, res) => {
 		{
 			$project: {
 				title: 1,
-				image: 1,
+				image: "$image.url",
 				category: 1,
 				isBarter: 1,
+				isWishlist: 1,
 				owner: {
-					name: 1,
-					avatar: "$owner.avatar.url",
+					name: "$ownerDetails.name",
+					avatar: "$ownerDetails.avatar.url",
 				},
 			},
 		},
@@ -94,9 +94,6 @@ const getUserProducts = asyncHandler(async (req, res) => {
 			{
 				$group: {
 					_id: "$owner",
-					productCount: {
-						$sum: 1,
-					},
 					products: {
 						$push: {
 							_id: "$_id",
@@ -125,9 +122,6 @@ const getUserProducts = asyncHandler(async (req, res) => {
 			{
 				$group: {
 					_id: "$owner",
-					productCount: {
-						$sum: 1,
-					},
 					products: {
 						$push: {
 							_id: "$_id",
@@ -152,7 +146,7 @@ const getUserProducts = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				products?.[0],
+				products?.[0]?.products,
 				"All user products retrieved successfully"
 			)
 		);
@@ -214,7 +208,6 @@ const getProductById = asyncHandler(async (req, res) => {
 		{
 			$project: {
 				_id: 0,
-				isAvailable: 0,
 				views: 0,
 				updatedAt: 0,
 				__v: 0,
@@ -312,7 +305,7 @@ const createProduct = asyncHandler(async (req, res) => {
 		}
 	}
 
-	if (price) {
+	if (isBarterBool === false || price) {
 		const { error } = validateProduct({
 			price,
 		});
@@ -407,7 +400,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 		}
 	}
 
-	if (price) {
+	if (product.isBarter === false || price) {
 		const { error } = validateProduct({
 			price,
 		});

@@ -27,7 +27,7 @@ const productSchema = Joi.object({
 	category: Joi.string().trim().min(3).max(30),
 	barterCategory: Joi.string().trim().min(3).max(30),
 	barterDescription: Joi.string().trim().min(10).max(150),
-	price: Joi.number().min(0),
+	price: Joi.number().min(1),
 	meetingSpot: Joi.string().trim().min(10).max(150),
 }).or(
 	"title",
@@ -37,7 +37,7 @@ const productSchema = Joi.object({
 	"barterCategory",
 	"barterDescription",
 	"price",
-	"meetingSpot",
+	"meetingSpot"
 );
 
 const transactionSchema = Joi.object({

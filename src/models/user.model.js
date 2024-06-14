@@ -83,6 +83,71 @@ userSchema.pre("save", async function (next) {
 	next();
 });
 
+userSchema.pre("remove", async function (next) {
+	try {
+		const userId = this._id;
+
+		const products = await mongoose
+			.model("Product")
+			.find({ owner: userId });
+		const productIds = products.map((product) => product._id);
+		await mongoose
+			.model("User")
+			.updateMany(
+				{ wishlist: { $in: productIds } },
+				{ $pull: { wishlist: { $in: productIds } } }
+			);
+
+		await mongoose.model("Product").deleteMany({ owner: userId });
+		await mongoose.model("Feedback").deleteMany({
+			$or: [
+				{
+					feedBackTo: userId,
+				},
+				{
+					feedBackBy: userId,
+				},
+			],
+		});
+		await mongoose.model("Follower").deleteMany({
+			$or: [
+				{
+					following: userId,
+				},
+				{
+					follower: userId,
+				},
+			],
+		});
+		await mongoose.model("Message").deleteMany({
+			$or: [
+				{
+					from: userId,
+				},
+				{
+					to: userId,
+				},
+			],
+		});
+		await mongoose.model("Notification").deleteMany({ user: userId });
+		await mongoose.model("Transaction").deleteMany({
+			$or: [
+				{
+					initiator: userId,
+				},
+				{
+					recipient: userId,
+				},
+			],
+		});
+
+		next();
+	} catch (error) {
+		console.error("Error during user removal cleanup:", error);
+		next(error);
+	}
+});
+
 userSchema.methods.isPasswordCorrect = async function (password) {
 	return await bcrypt.compare(password, this.password);
 };

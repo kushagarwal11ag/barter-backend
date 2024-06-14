@@ -120,15 +120,10 @@ const getAllMyFeedbacks = asyncHandler(async (req, res) => {
 				as: "feedbackFor",
 				pipeline: [
 					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
 						$project: {
 							_id: 1,
 							name: 1,
-							avatar: 1,
+							avatar: "$avatar.url",
 							blockedUsers: 1,
 						},
 					},
@@ -308,7 +303,7 @@ const deleteFeedback = asyncHandler(async (req, res) => {
 	}
 
 	await Feedback.findByIdAndDelete(feedbackId);
-	await Notification.deleteOne({feedbackId: feedbackId})
+	await Notification.deleteOne({ feedbackId: feedbackId });
 
 	return res
 		.status(200)

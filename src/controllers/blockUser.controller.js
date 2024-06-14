@@ -20,11 +20,6 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 				as: "blockedUsersDetails",
 				pipeline: [
 					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
 						$match: {
 							isBanned: { $ne: true },
 						},
@@ -33,7 +28,7 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 						$project: {
 							_id: 1,
 							name: 1,
-							avatar: 1,
+							avatar: "$avatar.url",
 						},
 					},
 				],
@@ -46,7 +41,7 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				_id: 1,
+				_id: 0,
 				blockedUsersDetails: 1,
 			},
 		},
@@ -57,7 +52,7 @@ const viewAllBlockedUsers = asyncHandler(async (req, res) => {
 		.json(
 			new ApiResponse(
 				200,
-				blockedUsers?.[0],
+				blockedUsers?.[0]?.blockedUsersDetails,
 				"Blocked users retrieved successfully"
 			)
 		);
@@ -85,10 +80,7 @@ const blockUser = asyncHandler(async (req, res) => {
 	}
 
 	const existingTransaction = await Transaction.findOne({
-		$or: [
-			{ initiator: blockUser },
-			{ recipient: blockUser },
-		],
+		$or: [{ initiator: blockUser }, { recipient: blockUser }],
 		orderStatus: "accept",
 	});
 	if (existingTransaction) {
