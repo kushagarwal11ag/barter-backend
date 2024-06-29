@@ -7,6 +7,122 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
+const handleSale = async (userId, priceRequested, productRequested, res) => {
+	const { error } = validateTransaction({
+		priceRequested,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
+	}
+	if (!priceRequested) {
+		throw new ApiError(400, "No amount provided for sale");
+	}
+	if (productRequested.isBarter) {
+		throw new ApiError(403, "Transaction type invalid");
+	}
+
+	const transaction = await Transaction.create({
+		transactionType: "sale",
+		productRequested: productRequested._id,
+		priceRequested,
+		initiator: userId,
+		recipient: productRequested.owner._id,
+	});
+
+	await Notification.create({
+		transactionId: transaction._id,
+		notificationType: "transaction",
+		content: "Transaction requested",
+		user: productRequested.owner._id,
+	});
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+};
+
+const handleBarter = async (userId, productRequested, productOffered, res) => {
+	const transaction = await Transaction.create({
+		transactionType: "barter",
+		productOffered: productOffered._id,
+		productRequested: productRequested._id,
+		initiator: userId,
+		recipient: productRequested.owner._id,
+	});
+
+	await Notification.create({
+		transactionId: transaction._id,
+		notificationType: "transaction",
+		content: "Transaction requested",
+		user: productRequested.owner._id,
+	});
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+};
+
+const handleHybrid = async (
+	userId,
+	productRequested,
+	productOffered,
+	priceOffered,
+	priceRequested,
+	res
+) => {
+	const { error } = validateTransaction({
+		priceOffered,
+		priceRequested,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
+	}
+
+	let newPriceOffered = priceOffered;
+	let newPriceRequested = priceRequested;
+
+	if (newPriceOffered > 0 && newPriceRequested > 0) {
+		if (newPriceOffered > newPriceRequested) {
+			newPriceOffered -= newPriceRequested;
+			newPriceRequested = 0;
+		} else if (newPriceOffered < newPriceRequested) {
+			newPriceRequested -= newPriceOffered;
+			newPriceOffered = 0;
+		} else {
+			newPriceOffered = newPriceRequested = 0;
+		}
+	} else if (newPriceOffered === 0 && newPriceRequested === 0) {
+		throw new ApiError(400, "Enter amount to initiate Hybrid exchange");
+	}
+
+	const transaction = await Transaction.create({
+		transactionType: "hybrid",
+		productOffered: productOffered._id,
+		productRequested: productRequested._id,
+		priceOffered: newPriceOffered,
+		priceRequested: newPriceRequested,
+		initiator: userId,
+		recipient: productRequested.owner._id,
+	});
+
+	await Notification.create({
+		transactionId: transaction._id,
+		notificationType: "transaction",
+		content: "Transaction requested",
+		user: productRequested.owner._id,
+	});
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+};
+
 const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 	const userId = req.user._id;
 	const blocked = req.user.blockedUsers;
@@ -383,46 +499,6 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		throw new ApiError(404, "Requested product not found");
 	}
 
-	const { error } = validateTransaction({
-		transactionType,
-		priceOffered,
-		priceRequested,
-	});
-	if (error) {
-		throw new ApiError(
-			400,
-			`Validation error: ${error.details[0].message}`
-		);
-	}
-
-	if (productRequested.owner._id.toString() === req.user._id.toString()) {
-		throw new ApiError(
-			403,
-			"Cannot initiate transaction with own product."
-		);
-	}
-	let activeTransaction = await Transaction.findOne({
-		$or: [
-			{ productOffered: productRequestedId },
-			{ productRequested: productRequestedId },
-		],
-		orderStatus: { $nin: ["cancel", "pending"] },
-	});
-	if (activeTransaction) {
-		throw new ApiError(
-			409,
-			"Cannot initiate transaction as product active in another transaction"
-		);
-	} else {
-		activeTransaction = await Transaction.findOne({
-			productRequested: productRequestedId,
-			initiator: req.user._id,
-			orderStatus: { $ne: "cancel" },
-		});
-		if (activeTransaction) {
-			throw new ApiError(409, "Cannot create duplicate transactions.");
-		}
-	}
 	if (
 		!productRequested.isAvailable ||
 		productRequested.owner.isBanned ||
@@ -432,40 +508,65 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		throw new ApiError(403, "Access forbidden.");
 	}
 
-	const isBarter = transactionType === "barter";
-	const isSale = transactionType === "sale";
-	const isHybrid = transactionType === "hybrid";
-	let newPriceOffered = priceOffered;
-	let newPriceRequested = priceRequested;
-
-	if (isSale && newPriceOffered === 0) {
-		throw new ApiError(400, "No amount provided for sale");
+	if (productRequested.owner._id.toString() === req.user._id.toString()) {
+		throw new ApiError(
+			403,
+			"Cannot initiate transaction with own product."
+		);
 	}
-	if (isHybrid && newPriceOffered > 0 && newPriceRequested > 0) {
-		if (newPriceOffered > newPriceRequested) {
-			newPriceOffered = newPriceOffered - newPriceRequested;
-			newPriceRequested = 0;
-		} else if (newPriceOffered < newPriceRequested) {
-			newPriceRequested = newPriceRequested - newPriceOffered;
-			newPriceOffered = 0;
-		} else {
-			newPriceOffered = newPriceRequested = 0;
+
+	const activeTransaction = await Transaction.findOne({
+		$or: [
+			{ productOffered: productRequested._id },
+			{ productRequested: productRequested._id },
+		],
+		orderStatus: { $nin: ["cancel", "pending"] },
+	});
+	if (activeTransaction) {
+		throw new ApiError(
+			409,
+			"Requested product is already involved in another transaction."
+		);
+	}
+	const duplicateTransaction = await Transaction.findOne({
+		productRequested: productRequested._id,
+		initiator: req.user._id,
+		orderStatus: { $ne: "cancel" },
+	});
+	if (duplicateTransaction) {
+		throw new ApiError(409, "Cannot create multiple transactions.");
+	}
+
+	const { error } = validateTransaction({
+		transactionType,
+	});
+	if (error) {
+		throw new ApiError(
+			400,
+			`Validation error: ${error.details[0].message}`
+		);
+	}
+
+	const userId = req.user._id;
+	if (transactionType === "sale")
+		handleSale(userId, priceRequested, productRequested, res);
+	else {
+		if (!productRequested.isBarter) {
+			throw new ApiError(403, "Transaction type invalid");
 		}
-	} else if (isHybrid && newPriceOffered === 0 && newPriceRequested === 0) {
-		throw new ApiError(400, "Enter amount to initiate Hybrid exchange");
-	}
-
-	let productOffered;
-	if (isBarter || isHybrid) {
 		if (!productOfferedId || !isValidObjectId(productOfferedId)) {
 			throw new ApiError(400, "Invalid or missing product offered ID");
 		}
-		productOffered = await Product.findById(productOfferedId);
+
+		const productOffered = await Product.findById(productOfferedId);
 		if (!productOffered) {
 			throw new ApiError(404, "Offered product not found");
 		}
-		if (productOffered.owner.toString() !== req.user._id.toString()) {
+		if (productOffered.owner.toString() !== userId.toString()) {
 			throw new ApiError(403, "Access forbidden");
+		}
+		if (!productOffered.isBarter) {
+			throw new ApiError(403, "Transaction type invalid");
 		}
 
 		const existingTransaction = await Transaction.findOne({
@@ -476,30 +577,23 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			orderStatus: { $nin: ["cancel", "pending"] },
 		});
 		if (existingTransaction) {
-			throw new ApiError(409, "Transaction initiation conflict.");
+			throw new ApiError(
+				409,
+				"Offered product is already involved in another transaction."
+			);
 		}
+		if (transactionType === "barter")
+			handleBarter(userId, productRequested, productOffered, res);
+		else
+			handleHybrid(
+				userId,
+				productRequested,
+				productOffered,
+				priceOffered,
+				priceRequested,
+				res
+			);
 	}
-
-	const transaction = await Transaction.create({
-		transactionType,
-		productOffered: isBarter || isHybrid ? productOfferedId : undefined,
-		productRequested: productRequestedId,
-		priceOffered: isSale || isHybrid ? newPriceOffered : 0,
-		priceRequested: isHybrid ? newPriceRequested : 0,
-		initiator: req.user._id,
-		recipient: productRequested.owner._id,
-	});
-
-	await Notification.create({
-		transactionId: transaction._id,
-		notificationType: "transaction",
-		content: "Transaction requested",
-		user: productRequested.owner._id,
-	});
-
-	return res
-		.status(200)
-		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
 });
 
 const updateTransactionAsInitiator = asyncHandler(async (req, res) => {

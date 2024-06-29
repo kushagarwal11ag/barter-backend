@@ -100,6 +100,7 @@ const getUserProducts = asyncHandler(async (req, res) => {
 							title: "$title",
 							image: "$image.url",
 							category: "$category",
+							isBarter: "$isBarter",
 							isAvailable: "$isAvailable",
 						},
 					},
@@ -179,14 +180,10 @@ const getProductById = asyncHandler(async (req, res) => {
 				as: "owner",
 				pipeline: [
 					{
-						$addFields: {
-							avatar: "$avatar.url",
-						},
-					},
-					{
 						$project: {
 							name: 1,
-							avatar: 1,
+							avatar: "$avatar.url",
+							rating: 1,
 							blockedUsers: 1,
 							isBanned: 1,
 						},
@@ -247,6 +244,7 @@ const getProductById = asyncHandler(async (req, res) => {
 			_id: product[0].owner._id,
 			name: product[0].owner.name,
 			avatar: product[0].owner.avatar,
+			rating: product[0].owner.rating,
 		},
 	};
 

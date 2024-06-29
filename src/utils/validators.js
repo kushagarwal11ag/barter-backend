@@ -27,7 +27,7 @@ const productSchema = Joi.object({
 	category: Joi.string().trim().min(3).max(30),
 	barterCategory: Joi.string().trim().min(3).max(30),
 	barterDescription: Joi.string().trim().min(10).max(150),
-	price: Joi.number().min(1),
+	price: Joi.number().min(0),
 	meetingSpot: Joi.string().trim().min(10).max(150),
 }).or(
 	"title",

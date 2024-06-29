@@ -353,7 +353,92 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const deleteAccount = asyncHandler(async (req, res) => {
-	await req.user.remove();
+	const userId = req.user._id;
+
+	const feedbacks = await Feedback.find({ feedbackBy: userId });
+	const products = await Product.find({ owner: userId });
+	const transactions = await Transaction.find({
+		$or: [
+			{
+				initiator: userId,
+			},
+			{
+				recipient: userId,
+			},
+		],
+	});
+
+	await Feedback.deleteMany({
+		$or: [
+			{
+				feedbackFor: userId,
+			},
+			{
+				feedBackBy: userId,
+			},
+		],
+	});
+
+	await Follower.deleteMany({
+		$or: [
+			{
+				following: userId,
+			},
+			{
+				follower: userId,
+			},
+		],
+	});
+
+	await Message.deleteMany({
+		$or: [
+			{
+				from: userId,
+			},
+			{
+				to: userId,
+			},
+		],
+	});
+
+	await Notification.deleteMany({
+		$or: [{ followedById: userId }, { user: userId }],
+	});
+	for (const feedback of feedbacks) {
+		await Notification.deleteMany({ feedbackId: feedback._id });
+	}
+	for (const transaction of transactions) {
+		await Notification.deleteMany({ transactionId: transaction._id });
+	}
+
+	for (const product of products) {
+		if (product.image?.id) {
+			await deleteFromCloudinary(product.image.id);
+		}
+		await User.updateMany({ $pull: { wishlist: product._id } });
+	}
+	await Product.deleteMany({ owner: userId });
+
+	await Transaction.deleteMany({
+		$or: [
+			{
+				initiator: userId,
+			},
+			{
+				recipient: userId,
+			},
+		],
+	});
+
+	if (req.user.avatar?.id) {
+		await deleteFromCloudinary(req.user.avatar.id);
+	}
+	if (req.user.banner?.id) {
+		await deleteFromCloudinary(req.user.banner.id);
+	}
+
+	await User.updateMany({ $pull: { blockedUsers: userId } });
+	await User.deleteOne({ _id: userId });
 
 	return res
 		.status(200)
