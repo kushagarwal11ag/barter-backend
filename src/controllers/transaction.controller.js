@@ -123,13 +123,16 @@ const handleHybrid = async (
 		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
 };
 
-const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
-	const userId = req.user._id;
-	const blocked = req.user.blockedUsers;
+const getAllTransactions = asyncHandler(async (req, res) => {
+	const userId = new mongoose.Types.ObjectId(req.user._id);
+	const blockedUsers = req.user.blockedUsers.map(
+		(id) => new mongoose.Types.ObjectId(id)
+	);
+
 	const transactions = await Transaction.aggregate([
 		{
 			$match: {
-				initiator: new mongoose.Types.ObjectId(userId),
+				$or: [{ initiator: userId }, { recipient: userId }],
 			},
 		},
 		{
@@ -137,98 +140,40 @@ const getAllUserAsInitiatorTransactions = asyncHandler(async (req, res) => {
 				from: "products",
 				localField: "productRequested",
 				foreignField: "_id",
-				as: "product",
+				as: "productRequestedDetails",
 				pipeline: [
 					{
-						$match: {
-							isAvailable: true,
-							owner: { $nin: blocked },
-						},
-					},
-					{
-						$addFields: {
-							image: "$image.url",
-						},
-					},
-					{
-						$lookup: {
-							from: "users",
-							localField: "owner",
-							foreignField: "_id",
-							as: "recipient",
-							pipeline: [
-								{
-									$match: {
-										blockedUsers: {
-											$nin: [
-												new mongoose.Types.ObjectId(
-													userId
-												),
-											],
-										},
-										isBanned: {
-											$ne: true,
-										},
-									},
-								},
-								{
-									$addFields: {
-										avatar: "$avatar.url",
-									},
-								},
-								{
-									$project: {
-										_id: 0,
-										name: 1,
-										avatar: 1,
-									},
-								},
-							],
-						},
-					},
-					{
 						$project: {
-							_id: 0,
+							_id: 1,
 							title: 1,
-							image: 1,
-							owner: { $ifNull: ["$recipient", null] },
+							description: 1,
+							image: "$image.url",
+							isAvailable: 1,
+							owner: 1,
 						},
 					},
 				],
 			},
 		},
 		{
-			$sort: {
-				createdAt: -1,
-			},
-		},
-		{
-			$project: {
-				createdAt: 0,
-				updatedAt: 0,
-				__v: 0,
-			},
-		},
-	]);
-
-	return res
-		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				transactions,
-				"Transactions retrieved successfully"
-			)
-		);
-});
-
-const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
-	const userId = req.user._id;
-	const blocked = req.user.blockedUsers;
-	const transactions = await Transaction.aggregate([
-		{
-			$match: {
-				recipient: new mongoose.Types.ObjectId(userId),
+			$lookup: {
+				from: "users",
+				localField: "recipient",
+				foreignField: "_id",
+				as: "recipientDetails",
+				pipeline: [
+					{
+						$addFields: {
+							isBlocked: {
+								$or: [
+									{ $in: [userId, "$blockedUsers"] },
+									{ isBanned: true },
+									{ $in: ["$_id", blockedUsers] },
+								],
+							},
+						},
+					},
+				],
 			},
 		},
 		{
@@ -236,64 +181,84 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 				from: "products",
 				localField: "productOffered",
 				foreignField: "_id",
-				as: "product",
+				as: "productOfferedDetails",
 				pipeline: [
 					{
-						$match: {
-							isAvailable: true,
-							owner: { $nin: blocked },
-						},
-					},
-					{
-						$addFields: {
-							image: "$image.url",
-						},
-					},
-					{
-						$lookup: {
-							from: "users",
-							localField: "owner",
-							foreignField: "_id",
-							as: "recipient",
-							pipeline: [
-								{
-									$match: {
-										blockedUsers: {
-											$nin: [
-												new mongoose.Types.ObjectId(
-													userId
-												),
-											],
-										},
-										isBanned: {
-											$ne: true,
-										},
-									},
-								},
-								{
-									$addFields: {
-										avatar: "$avatar.url",
-									},
-								},
-								{
-									$project: {
-										_id: 0,
-										name: 1,
-										avatar: 1,
-									},
-								},
-							],
-						},
-					},
-					{
 						$project: {
-							_id: 0,
+							_id: 1,
 							title: 1,
-							image: 1,
-							owner: { $ifNull: ["$recipient", null] },
+							description: 1,
+							image: "$image.url",
+							isAvailable: 1,
+							owner: 1,
 						},
 					},
 				],
+			},
+		},
+		{
+			$lookup: {
+				from: "users",
+				localField: "initiator",
+				foreignField: "_id",
+				as: "initiatorDetails",
+				pipeline: [
+					{
+						$addFields: {
+							isBlocked: {
+								$or: [
+									{ $in: [userId, "$blockedUsers"] },
+									{ isBanned: true },
+									{ $in: ["$_id", blockedUsers] },
+								],
+							},
+						},
+					},
+				],
+			},
+		},
+		// {
+		// 	$match: {
+		// 		"initiatorDetails.isBlocked": { $ne: true },
+		// 		"recipientDetails.isBlocked": { $ne: true },
+		// 		"productRequestedDetails.isAvailable": { $ne: false },
+		// 		"productOfferedDetails.isAvailable": { $ne: false },
+		// 	},
+		// },
+		{
+			$addFields: {
+				productDetails: {
+					$cond: {
+						if: { $eq: ["$transactionType", "sale"] },
+						then: { $arrayElemAt: ["$productRequestedDetails", 0] },
+						else: {
+							$cond: {
+								if: {
+									$eq: ["$initiator", userId],
+								},
+								then: {
+									$arrayElemAt: ["$productOfferedDetails", 0],
+								},
+								else: {
+									$arrayElemAt: [
+										"$productRequestedDetails",
+										0,
+									],
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			$group: {
+				_id: "$productDetails._id",
+				transactionType: { $first: "$transactionType" },
+				initiator: { $first: "$initiator" },
+				recipient: { $first: "$recipient" },
+				productDetails: { $first: "$productDetails" },
+				count: { $sum: 1 },
 			},
 		},
 		{
@@ -303,9 +268,12 @@ const getAllUserAsRecipientTransactions = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				createdAt: 0,
-				updatedAt: 0,
-				__v: 0,
+				_id: 1,
+				transactionType: 1,
+				productDetails: 1,
+				initiator: 1,
+				recipient: 1,
+				count: 1,
 			},
 		},
 	]);
@@ -517,8 +485,8 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 
 	const activeTransaction = await Transaction.findOne({
 		$or: [
-			{ productOffered: productRequested._id },
-			{ productRequested: productRequested._id },
+			{ productOffered: productRequestedId },
+			{ productRequested: productRequestedId },
 		],
 		orderStatus: { $nin: ["cancel", "pending"] },
 	});
@@ -529,7 +497,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		);
 	}
 	const duplicateTransaction = await Transaction.findOne({
-		productRequested: productRequested._id,
+		productRequested: productRequestedId,
 		initiator: req.user._id,
 		orderStatus: { $ne: "cancel" },
 	});
@@ -581,6 +549,14 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 				409,
 				"Offered product is already involved in another transaction."
 			);
+		}
+		const duplicateTransaction = await Transaction.findOne({
+			productRequested: productOfferedId,
+			productOffered: productRequestedId,
+			orderStatus: { $ne: "cancel" },
+		});
+		if (duplicateTransaction) {
+			throw new ApiError(409, "Transaction already in progress.");
 		}
 		if (transactionType === "barter")
 			handleBarter(userId, productRequested, productOffered, res);
@@ -918,8 +894,7 @@ const updateTransactionAsRecipient = asyncHandler(async (req, res) => {
 });
 
 export {
-	getAllUserAsInitiatorTransactions,
-	getAllUserAsRecipientTransactions,
+	getAllTransactions,
 	getTransactionDetails,
 	initiateTransaction,
 	updateTransactionAsInitiator,
@@ -927,8 +902,7 @@ export {
 };
 
 /*
-get all user as initiator transactions ✔️
-get all user as recipient transactions ✔️
+get all transactions ✔️
 get transaction details ✔️
 initiate transaction - send notification ✔️
 update transaction status - send notification ✔️

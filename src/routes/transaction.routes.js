@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
-	getAllUserAsInitiatorTransactions,
-	getAllUserAsRecipientTransactions,
+	getAllTransactions,
 	getTransactionDetails,
 	initiateTransaction,
 	updateTransactionAsInitiator,
@@ -13,12 +12,7 @@ import checkVerificationAndBan from "../middlewares/checkVerificationAndBan.midd
 const router = Router();
 
 //secured routes
-router
-	.route("/user/initiator")
-	.get(verifyJWT, checkVerificationAndBan, getAllUserAsInitiatorTransactions);
-router
-	.route("/user/recipient")
-	.get(verifyJWT, checkVerificationAndBan, getAllUserAsRecipientTransactions);
+router.route("/").get(verifyJWT, checkVerificationAndBan, getAllTransactions);
 router
 	.route("/:transactionId")
 	.get(verifyJWT, checkVerificationAndBan, getTransactionDetails);
