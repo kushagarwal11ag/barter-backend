@@ -113,16 +113,6 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 					},
 					{
 						$addFields: {
-							initiatorDetails: {
-								$arrayElemAt: ["$initiatorDetails", 0],
-							},
-							recipientDetails: {
-								$arrayElemAt: ["$recipientDetails", 0],
-							},
-						},
-					},
-					{
-						$addFields: {
 							userDetails: {
 								$cond: {
 									if: {
@@ -147,6 +137,11 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 			},
 		},
 		{
+            $addFields: {
+                transactionUser: { $arrayElemAt: ["$transactionDetails.userDetails", 0] },
+            },
+        },
+		{
 			$sort: {
 				createdAt: -1,
 			},
@@ -160,7 +155,13 @@ const getAllUserNotifications = asyncHandler(async (req, res) => {
 				createdAt: 1,
 				feedbackByUser: "$feedbackDetails.feedbackByUser",
 				followedByUser: 1,
-				transactionUser: "$transactionDetails.userDetails",
+				transactionUser: {
+					$cond: {
+						if: "$transactionUser",
+						then: "$transactionUser",
+						else: "$$REMOVE",
+					},
+				},
 				user: 1,
 			},
 		},
@@ -234,9 +235,3 @@ export {
 	toggleNotificationStatus,
 	deleteNotification,
 };
-
-/*
-get all user notifications ✔️
-toggle notification status ✔️
-delete notification ✔️
-*/

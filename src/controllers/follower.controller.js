@@ -283,9 +283,3 @@ const unFollowUser = asyncHandler(async (req, res) => {
 });
 
 export { getAllUserFollowers, getAllUserFollowing, followUser, unFollowUser };
-/*
-get all user followers ✔️
-get all following ✔️
-follow user - send notification ✔️
-un-follow user ✔️
-*/

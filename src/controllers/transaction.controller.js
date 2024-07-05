@@ -32,16 +32,7 @@ const handleSale = async (userId, priceRequested, productRequested, res) => {
 		recipient: productRequested.owner._id,
 	});
 
-	await Notification.create({
-		transactionId: transaction._id,
-		notificationType: "transaction",
-		content: "Transaction requested",
-		user: productRequested.owner._id,
-	});
-
-	return res
-		.status(200)
-		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+	return transaction._id;
 };
 
 const handleBarter = async (userId, productRequested, productOffered, res) => {
@@ -53,16 +44,7 @@ const handleBarter = async (userId, productRequested, productOffered, res) => {
 		recipient: productRequested.owner._id,
 	});
 
-	await Notification.create({
-		transactionId: transaction._id,
-		notificationType: "transaction",
-		content: "Transaction requested",
-		user: productRequested.owner._id,
-	});
-
-	return res
-		.status(200)
-		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+	return transaction._id;
 };
 
 const handleHybrid = async (
@@ -111,16 +93,7 @@ const handleHybrid = async (
 		recipient: productRequested.owner._id,
 	});
 
-	await Notification.create({
-		transactionId: transaction._id,
-		notificationType: "transaction",
-		content: "Transaction requested",
-		user: productRequested.owner._id,
-	});
-
-	return res
-		.status(200)
-		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
+	return transaction._id;
 };
 
 const getAllTransactions = asyncHandler(async (req, res) => {
@@ -274,6 +247,148 @@ const getAllTransactions = asyncHandler(async (req, res) => {
 				initiator: 1,
 				recipient: 1,
 				count: 1,
+			},
+		},
+	]);
+
+	return res
+		.status(200)
+		.json(
+			new ApiResponse(
+				200,
+				transactions,
+				"Transactions retrieved successfully"
+			)
+		);
+});
+
+const getProductTransactions = asyncHandler(async (req, res) => {
+	const { productId } = req.params;
+	if (!productId || !isValidObjectId(productId)) {
+		throw new ApiError(400, "Invalid or missing product ID");
+	}
+	const userId = new mongoose.Types.ObjectId(req.user._id);
+	const blockedUsers = req.user.blockedUsers.map(
+		(id) => new mongoose.Types.ObjectId(id)
+	);
+
+	const transactions = await Transaction.aggregate([
+		{
+			$match: {
+				$or: [
+					{
+						productRequested: new mongoose.Types.ObjectId(
+							productId
+						),
+					},
+					{ productOffered: new mongoose.Types.ObjectId(productId) },
+				],
+			},
+		},
+		{
+			$lookup: {
+				from: "products",
+				localField: "productRequested",
+				foreignField: "_id",
+				as: "productRequested",
+				pipeline: [
+					{
+						$project: {
+							_id: 1,
+							image: "$image.url",
+							isAvailable: 1,
+							owner: 1,
+						},
+					},
+				],
+			},
+		},
+		{
+			$unwind: "$productRequested",
+		},
+		{
+			$lookup: {
+				from: "users",
+				localField: "recipient",
+				foreignField: "_id",
+				as: "recipientDetails",
+				pipeline: [
+					{
+						$addFields: {
+							isBlocked: {
+								$or: [
+									{ $in: [userId, "$blockedUsers"] },
+									{ isBanned: true },
+									{ $in: ["$_id", blockedUsers] },
+								],
+							},
+						},
+					},
+				],
+			},
+		},
+		{
+			$lookup: {
+				from: "products",
+				localField: "productOffered",
+				foreignField: "_id",
+				as: "productOffered",
+				pipeline: [
+					{
+						$project: {
+							_id: 1,
+							image: "$image.url",
+							isAvailable: 1,
+							owner: 1,
+						},
+					},
+				],
+			},
+		},
+		{
+			$unwind: "$productOffered",
+		},
+		{
+			$lookup: {
+				from: "users",
+				localField: "initiator",
+				foreignField: "_id",
+				as: "initiatorDetails",
+				pipeline: [
+					{
+						$addFields: {
+							isBlocked: {
+								$or: [
+									{ $in: [userId, "$blockedUsers"] },
+									{ isBanned: true },
+									{ $in: ["$_id", blockedUsers] },
+								],
+							},
+						},
+					},
+				],
+			},
+		},
+		// {
+		// 	$match: {
+		// 		"initiatorDetails.isBlocked": { $ne: true },
+		// 		"recipientDetails.isBlocked": { $ne: true },
+		// 		"productRequestedDetails.isAvailable": { $ne: false },
+		// 		"productOfferedDetails.isAvailable": { $ne: false },
+		// 	},
+		// },
+		{
+			$sort: {
+				createdAt: -1,
+			},
+		},
+		{
+			$project: {
+				initiatorDetails: 0,
+				recipientDetails: 0,
+				createdAt: 0,
+				updatedAt: 0,
+				__v: 0,
 			},
 		},
 	]);
@@ -516,8 +631,14 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 	}
 
 	const userId = req.user._id;
+	let transactionId;
 	if (transactionType === "sale")
-		handleSale(userId, priceRequested, productRequested, res);
+		transactionId = await handleSale(
+			userId,
+			priceRequested,
+			productRequested,
+			res
+		);
 	else {
 		if (!productRequested.isBarter) {
 			throw new ApiError(403, "Transaction type invalid");
@@ -559,9 +680,14 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			throw new ApiError(409, "Transaction already in progress.");
 		}
 		if (transactionType === "barter")
-			handleBarter(userId, productRequested, productOffered, res);
+			transactionId = await handleBarter(
+				userId,
+				productRequested,
+				productOffered,
+				res
+			);
 		else
-			handleHybrid(
+			transactionId = await handleHybrid(
 				userId,
 				productRequested,
 				productOffered,
@@ -570,6 +696,17 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 				res
 			);
 	}
+
+	await Notification.create({
+		transactionId: transactionId,
+		notificationType: "transaction",
+		content: "Transaction requested",
+		user: productRequested.owner._id,
+	});
+
+	return res
+		.status(200)
+		.json(new ApiResponse(200, {}, "Transaction initiated successfully"));
 });
 
 const updateTransactionAsInitiator = asyncHandler(async (req, res) => {
@@ -895,15 +1032,9 @@ const updateTransactionAsRecipient = asyncHandler(async (req, res) => {
 
 export {
 	getAllTransactions,
+	getProductTransactions,
 	getTransactionDetails,
 	initiateTransaction,
 	updateTransactionAsInitiator,
 	updateTransactionAsRecipient,
 };
-
-/*
-get all transactions ✔️
-get transaction details ✔️
-initiate transaction - send notification ✔️
-update transaction status - send notification ✔️
-*/

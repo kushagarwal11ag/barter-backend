@@ -486,16 +486,33 @@ const deleteProduct = asyncHandler(async (req, res) => {
 		await deleteFromCloudinary(product.image?.id);
 	}
 
-	await Product.findByIdAndDelete(productId);
 	await User.updateMany({
 		$pull: {
 			wishlist: productId,
 		},
 	});
+
+	const allTransactions = await Transaction.find(
+		{
+			$or: [
+				{ productOffered: productId },
+				{ productRequested: productId },
+			],
+		},
+		{ _id: 1 }
+	);
+
+	const transactionIds = allTransactions.map(
+		(transaction) => transaction._id
+	);
+
+	await Notification.deleteMany({ transactionId: { $in: transactionIds } });
+
 	await Transaction.deleteMany({
-		productOffered: productId,
+		$or: [{ productOffered: productId }, { productRequested: productId }],
 	});
-	await Notification.deleteMany({ productId });
+
+	await Product.findByIdAndDelete(productId);
 
 	return res
 		.status(200)
@@ -510,12 +527,3 @@ export {
 	updateProduct,
 	deleteProduct,
 };
-
-/*
-get all products ✔️
-get all user products ✔️
-get particular product (update views) ✔️
-create product ✔️
-update product ✔️ - do not update if in transaction
-delete product ✔️
-*/

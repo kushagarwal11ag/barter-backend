@@ -317,11 +317,3 @@ export {
 	updateFeedback,
 	deleteFeedback,
 };
-
-/*
-get all user feedbacks ✔️
-get all my feedbacks ✔️
-create feedback - send notification ✔️
-update feedback ✔️
-delete feedback ✔️
-*/

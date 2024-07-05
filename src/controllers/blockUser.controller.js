@@ -119,9 +119,3 @@ const unblockUser = asyncHandler(async (req, res) => {
 });
 
 export { viewAllBlockedUsers, blockUser, unblockUser };
-
-/*
-view all blocked users ✔️
-block user ✔️
-unblock user ✔️
-*/

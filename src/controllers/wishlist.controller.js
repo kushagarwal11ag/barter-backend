@@ -162,9 +162,3 @@ const removeFromWishlist = asyncHandler(async (req, res) => {
 });
 
 export { getUserWishlist, addToWishlist, removeFromWishlist };
-
-/*
-get user wishlist ✔️
-add to user wishlist ✔️
-remove from user wishlist ✔️
-*/
