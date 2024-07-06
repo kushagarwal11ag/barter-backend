@@ -7,7 +7,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 
-const handleSale = async (userId, priceRequested, productRequested, res) => {
+const handleSale = async (userId, priceRequested, productRequested) => {
 	const { error } = validateTransaction({
 		priceRequested,
 	});
@@ -27,7 +27,7 @@ const handleSale = async (userId, priceRequested, productRequested, res) => {
 	const transaction = await Transaction.create({
 		transactionType: "sale",
 		productRequested: productRequested._id,
-		priceRequested,
+		priceOffered: priceRequested,
 		initiator: userId,
 		recipient: productRequested.owner._id,
 	});
@@ -35,7 +35,7 @@ const handleSale = async (userId, priceRequested, productRequested, res) => {
 	return transaction._id;
 };
 
-const handleBarter = async (userId, productRequested, productOffered, res) => {
+const handleBarter = async (userId, productRequested, productOffered) => {
 	const transaction = await Transaction.create({
 		transactionType: "barter",
 		productOffered: productOffered._id,
@@ -52,8 +52,7 @@ const handleHybrid = async (
 	productRequested,
 	productOffered,
 	priceOffered,
-	priceRequested,
-	res
+	priceRequested
 ) => {
 	const { error } = validateTransaction({
 		priceOffered,
@@ -66,8 +65,8 @@ const handleHybrid = async (
 		);
 	}
 
-	let newPriceOffered = priceOffered;
-	let newPriceRequested = priceRequested;
+	let newPriceOffered = priceRequested;
+	let newPriceRequested = priceOffered;
 
 	if (newPriceOffered > 0 && newPriceRequested > 0) {
 		if (newPriceOffered > newPriceRequested) {
@@ -346,7 +345,10 @@ const getProductTransactions = asyncHandler(async (req, res) => {
 			},
 		},
 		{
-			$unwind: "$productOffered",
+			$unwind: {
+				path: "$productOffered",
+				preserveNullAndEmptyArrays: true,
+			},
 		},
 		{
 			$lookup: {
@@ -393,12 +395,47 @@ const getProductTransactions = asyncHandler(async (req, res) => {
 		},
 	]);
 
+	const transformedTransactions = transactions.map((transaction) => {
+		if (transaction.transactionType === "sale") {
+			const isRequesterOwner =
+				transaction.productRequested.owner.equals(userId);
+			return {
+				...transaction,
+				priceOffered: isRequesterOwner
+					? undefined
+					: transaction.priceOffered,
+				priceRequested: isRequesterOwner
+					? transaction.priceOffered
+					: undefined,
+				productRequested: isRequesterOwner
+					? undefined
+					: transaction.productRequested,
+				productOffered: isRequesterOwner
+					? transaction.productRequested
+					: undefined,
+			};
+		} else {
+			const isOffererOwner =
+				transaction.productOffered?.owner.equals(userId);
+
+			if (isOffererOwner) return transaction;
+
+			return {
+				...transaction,
+				priceOffered: transaction.priceRequested,
+				priceRequested: transaction.priceOffered,
+				productOffered: transaction.productRequested,
+				productRequested: transaction.productOffered,
+			};
+		}
+	});
+
 	return res
 		.status(200)
 		.json(
 			new ApiResponse(
 				200,
-				transactions,
+				transformedTransactions,
 				"Transactions retrieved successfully"
 			)
 		);
@@ -636,8 +673,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 		transactionId = await handleSale(
 			userId,
 			priceRequested,
-			productRequested,
-			res
+			productRequested
 		);
 	else {
 		if (!productRequested.isBarter) {
@@ -683,8 +719,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 			transactionId = await handleBarter(
 				userId,
 				productRequested,
-				productOffered,
-				res
+				productOffered
 			);
 		else
 			transactionId = await handleHybrid(
@@ -692,8 +727,7 @@ const initiateTransaction = asyncHandler(async (req, res) => {
 				productRequested,
 				productOffered,
 				priceOffered,
-				priceRequested,
-				res
+				priceRequested
 			);
 	}
 
