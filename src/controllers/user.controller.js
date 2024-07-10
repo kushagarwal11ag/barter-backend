@@ -20,12 +20,14 @@ import ApiResponse from "../utils/ApiResponse.js";
 const options = {
 	httpOnly: true,
 	secure: true,
+	sameSite: "Strict",
 };
+const accessTokenExpiry = 15 * 60 * 1000; // 15 minutes
+const refreshTokenExpiry = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // helper methods
-const generateAccessAndRefreshTokens = async (userId) => {
+const generateAccessAndRefreshTokens = async (user) => {
 	try {
-		const user = await User.findById(userId);
 		const accessToken = await user.generateAccessToken();
 		const refreshToken = await user.generateRefreshToken();
 
@@ -98,7 +100,7 @@ const loginUser = asyncHandler(async (req, res) => {
 	}
 
 	const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
-		user._id
+		user
 	);
 
 	const loggedInUser = user.toObject();
@@ -108,11 +110,20 @@ const loginUser = asyncHandler(async (req, res) => {
 	delete loggedInUser.isVerified;
 	delete loggedInUser.isBanned;
 	delete loggedInUser.refreshToken;
+	delete loggedInUser.tokenVersion;
 
 	return res
 		.status(200)
-		.cookie("accessToken", accessToken, options)
-		.cookie("refreshToken", refreshToken, options)
+		.cookie("accessToken", accessToken, {
+			...options,
+			maxAge: accessTokenExpiry,
+			expires: new Date(Date.now() + accessTokenExpiry),
+		})
+		.cookie("refreshToken", refreshToken, {
+			...options,
+			maxAge: refreshTokenExpiry,
+			expires: new Date(Date.now() + refreshTokenExpiry),
+		})
 		.json(
 			new ApiResponse(
 				200,
@@ -161,6 +172,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 	const currentUser = req.user.toObject();
 	delete currentUser.isVerified;
 	delete currentUser.isBanned;
+	delete currentUser.tokenVersion;
 	return res
 		.status(200)
 		.json(
@@ -333,22 +345,27 @@ const updateUserFiles = asyncHandler(async (req, res) => {
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
-	await User.findByIdAndUpdate(
-		req.user?._id,
-		{
-			$unset: {
-				refreshToken: 1,
-			},
+	await User.findByIdAndUpdate(req.user?._id, {
+		$unset: {
+			refreshToken: 1,
 		},
-		{
-			new: true,
-		}
-	);
+		$inc: {
+			tokenVersion: 1,
+		},
+	});
 
 	return res
 		.status(200)
-		.clearCookie("accessToken", options)
-		.clearCookie("refreshToken", options)
+		.clearCookie("accessToken", {
+			httpOnly: true,
+			secure: true,
+			sameSite: "Strict",
+		})
+		.clearCookie("refreshToken", {
+			httpOnly: true,
+			secure: true,
+			sameSite: "Strict",
+		})
 		.json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
@@ -450,7 +467,10 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 		req.cookies?.refreshToken || req.body?.refreshToken;
 
 	if (!incomingRefreshToken) {
-		throw new ApiError(401, "Unauthorized request");
+		throw new ApiError(
+			401,
+			"Unauthorized request. No refresh token provided"
+		);
 	}
 
 	try {
@@ -460,21 +480,34 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 		);
 		const user = await User.findById(decodedToken?._id);
 
-		if (!user || incomingRefreshToken !== user?.refreshToken) {
+		if (
+			!user ||
+			incomingRefreshToken !== user.refreshToken ||
+			decodedToken.tokenVersion !== user.tokenVersion
+		) {
 			throw new ApiError(401, "Invalid or expired refresh token.");
 		}
 
-		const { accessToken, refreshToken: newRefreshToken } =
-			await generateAccessAndRefreshTokens(user._id);
+		const { accessToken, refreshToken } =
+			await generateAccessAndRefreshTokens(user);
 
 		return res
 			.status(200)
-			.cookie("accessToken", accessToken, options)
-			.cookie("refreshToken", newRefreshToken, options)
+			.cookie("accessToken", accessToken, {
+				...options,
+				maxAge: accessTokenExpiry,
+				expires: new Date(Date.now() + accessTokenExpiry),
+			})
+			.cookie("refreshToken", refreshToken, {
+				...options,
+				maxAge: refreshTokenExpiry,
+				expires: new Date(Date.now() + refreshTokenExpiry),
+			})
 			.json(
 				new ApiResponse(
 					200,
-					{ accessToken, refreshToken: newRefreshToken },
+					accessToken,
+					refreshToken,
 					"Access token refreshed successfully."
 				)
 			);

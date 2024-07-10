@@ -5,33 +5,32 @@ import User from "../models/user.model.js";
 
 const verifyJWT = asyncHandler(async (req, res, next) => {
 	try {
-		const token =
+		const accessToken =
 			req.cookies?.accessToken ||
 			req.header("Authorization")?.replace("Bearer ", "");
 
-		if (!token) {
-			throw new ApiError(
-				401,
-				"Unauthorized request. No access token provided"
-			);
+		if (!accessToken) {
+			throw new ApiError(401, "No access token provided. Please log in.");
 		}
 
-		const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+		const decodedToken = jwt.verify(
+			accessToken,
+			process.env.ACCESS_TOKEN_SECRET
+		);
 		const user = await User.findById(decodedToken?._id).select(
 			"-password -refreshToken"
 		);
 
-		if (!user) {
-			throw new ApiError(401, "Invalid Access Token. User not found");
+		if (!user || user.tokenVersion !== decodedToken.tokenVersion) {
+			throw new ApiError(401, "Invalid Access Token.");
 		}
-
+		
 		req.user = user;
 		next();
 	} catch (error) {
-		throw new ApiError(
-			401,
-			error?.message || "Invalid access token. Please authenticate."
-		);
+		if (error.name === "TokenExpiredError")
+			throw new ApiError(401, "Access token expired. Please refresh.");
+		throw new ApiError(401, error?.message || "Invalid access token. Please authenticate.");
 	}
 });
 

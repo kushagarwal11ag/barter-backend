@@ -71,6 +71,10 @@ const userSchema = new Schema(
 		refreshToken: {
 			type: String,
 		},
+		tokenVersion: {
+			type: Number,
+			default: 0,
+		},
 	},
 	{
 		timestamps: true,
@@ -91,6 +95,7 @@ userSchema.methods.generateAccessToken = async function () {
 	return jwt.sign(
 		{
 			_id: this._id,
+			tokenVersion: this.tokenVersion,
 		},
 		process.env.ACCESS_TOKEN_SECRET,
 		{
@@ -103,6 +108,7 @@ userSchema.methods.generateRefreshToken = async function () {
 	return jwt.sign(
 		{
 			_id: this._id,
+			tokenVersion: this.tokenVersion,
 		},
 		process.env.REFRESH_TOKEN_SECRET,
 		{
